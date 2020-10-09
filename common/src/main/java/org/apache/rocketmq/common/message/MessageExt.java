@@ -24,6 +24,10 @@ import java.nio.ByteBuffer;
 import org.apache.rocketmq.common.TopicFilterType;
 import org.apache.rocketmq.common.sysflag.MessageSysFlag;
 
+/**
+ * Message 扩展信息
+ * [MessageExt [brokerName=wewedeMacBook-Pro.local, queueId=0, storeSize=203, queueOffset=3436, sysFlag=0, bornTimestamp=1601275494590, bornHost=/10.1.22.190:59631, storeTimestamp=1601275494591, storeHost=/10.1.22.190:10911, msgId=0A0116BE00002A9F00000000002A87E6, commitLogOffset=2787302, bodyCRC=401605781, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=3437, CONSUME_START_TIME=1601275494592, UNIQ_KEY=0A0116BE573918B4AAC28E35DCBE02F0, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 55, 53, 50], transactionId='null'}]]
+ */
 public class MessageExt extends Message {
     private static final long serialVersionUID = 5720810158625748049L;
 

@@ -27,6 +27,7 @@ public class Message implements Serializable {
 
     private String topic;
     private int flag;
+    //{MIN_OFFSET=0, MAX_OFFSET=3490, CONSUME_START_TIME=1601275494759, UNIQ_KEY=0A0116BE573918B4AAC28E35DD6503D5, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}
     private Map<String, String> properties;
     private byte[] body;
     private String transactionId;

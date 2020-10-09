@@ -19,6 +19,9 @@ package org.apache.rocketmq.client.producer;
 import com.alibaba.fastjson.JSON;
 import org.apache.rocketmq.common.message.MessageQueue;
 
+/**
+ * [sendStatus=SEND_OK, msgId=0A0116BE573918B4AAC28E35DD6603D6, offsetMsgId=0A0116BE00002A9F00000000002B3E48, messageQueue=MessageQueue [topic=TopicTest, brokerName=wewedeMacBook-Pro.local, queueId=2], queueOffset=3492]
+ */
 public class SendResult {
     private SendStatus sendStatus;
     private String msgId;
