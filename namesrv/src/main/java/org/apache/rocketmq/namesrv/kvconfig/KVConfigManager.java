@@ -28,6 +28,10 @@ import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.common.protocol.body.KVTable;
 import org.apache.rocketmq.namesrv.NamesrvController;
+
+/**
+ * 配置 KV 属性管理器
+ */
 public class KVConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
@@ -168,7 +172,7 @@ public class KVConfigManager {
 
         return null;
     }
-
+    // 每隔 10 分钟打印一次配置
     public void printAllPeriodically() {
         try {
             this.lock.readLock().lockInterruptibly();

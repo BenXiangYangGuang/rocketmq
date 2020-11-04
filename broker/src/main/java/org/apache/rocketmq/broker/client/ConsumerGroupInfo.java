@@ -80,6 +80,10 @@ public class ConsumerGroupInfo {
         return result;
     }
 
+    /**
+     * 获取某个 topic 下的所有 消费端 clientId
+     * @return
+     */
     public List<String> getAllClientId() {
         List<String> result = new ArrayList<>();
 

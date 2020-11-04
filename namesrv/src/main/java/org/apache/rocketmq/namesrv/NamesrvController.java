@@ -38,7 +38,9 @@ import org.apache.rocketmq.remoting.netty.NettyServerConfig;
 import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
 import org.apache.rocketmq.srvutil.FileWatchService;
 
-
+/**
+ * NamesrvController 为 NameServer 核心控制器
+ */
 public class NamesrvController {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
@@ -48,9 +50,11 @@ public class NamesrvController {
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "NSScheduledThread"));
+    // KV 配置管理
     private final KVConfigManager kvConfigManager;
+    // topic 路由信息管理
     private final RouteInfoManager routeInfoManager;
-
+    // 业务线程池
     private RemotingServer remotingServer;
 
     private BrokerHousekeepingService brokerHousekeepingService;
@@ -73,17 +77,25 @@ public class NamesrvController {
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
     }
 
+    /**
+     * NamesrvController 对象初始化
+     * 加载 KV 配置，创 NettyServer 网络处理对象，然后开启两个定时任务，在 RocketMQ 中此类定时任务统称为心跳检测。
+     * 定时任务1：NameServer 每隔 10s 扫描一次 Broker 的注册信息brokerLiveTable ，如果连续 120s 没有有收到心跳包， NameServer 将移除该 Broker 的路由信息，同时关闭 Socket 连接。
+     * 定时任务2: NameServer 每隔 10 分钟打印一次 KV 配置
+     * @return
+     */
     public boolean initialize() {
-
+        // 加载配置
         this.kvConfigManager.load();
-
+        // 创建 NettyServer 网络对象
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
+        // 业务线程池
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
 
         this.registerProcessor();
-
+        // 每隔 10 秒，扫描一次 brokerLiveTable，如果连续 120s 没有有收到心跳包， NameServer 将移除该 Broker 的路由信息，同时关闭 Socket 连接。
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -91,7 +103,7 @@ public class NamesrvController {
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
             }
         }, 5, 10, TimeUnit.SECONDS);
-
+        // 每隔 10 分钟打印一次配置
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -102,6 +114,7 @@ public class NamesrvController {
 
         if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {
             // Register a listener to reload SslContext
+            // 注册一个监听器，加载安全配置Context
             try {
                 fileWatchService = new FileWatchService(
                     new String[] {

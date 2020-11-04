@@ -16,7 +16,36 @@
  */
 package org.apache.rocketmq.remoting.netty;
 
+/**
+ * Netty 网络服务的配置参数
+ */
 public class NettyServerConfig implements Cloneable {
+    /**
+     * listenPort: NameServer 监昕端口，该值默认会被初始化为 9876。
+     *
+     * serverWorkerThreads: Netty 业务线程池线程个数。
+     *
+     * serverCallbackExecutorThreads : Netty public 任务线程池线程个数， Netty 网络设计，
+     * 根据业务类型会创建不同的线程池，比如处理消息发送、消息消费、心跳检测等
+     * 如果该业务类型（ RequestCode ）未注册线程池， 则由 public 线程池执行。
+     *
+     * serverSelectorThreads: IO 线程池线程个数，主要是 NameServer、Broker 端解析请求、
+     * 返回相应的线程个数，这类线程主要是处理网络请求的，解析请求包， 然后转发到各个业务线程池完成具体的业务操作，然后将结果再返回调用方。
+     *
+     * serverOneWaySemaphoreValue: send oneway 消息请求井发度（ Broker 端参数）。
+     *
+     * serverAsyncSemaphore Value 异步消息发送最大并发度（ Broker 端参数）
+     *
+     * serverChannelMaxld eTimeSeconds ：网络连接最大空闲时间，默认 120s 如果连接空闲时间超过该参数设置的值，连接将被关闭。
+     *
+     * serverSocketSndBufSize ：网 socket 发送缓存区大小， 默认 64k。
+     *
+     * serverSocketRcvBufSize ：网络 socket 接收缓存区大 ，默认 64k。
+     *
+     * serverPooledByteBufAllocatorEnable: ByteBuffer 是否开启缓存，建议开启。
+     *
+     * useEpollNativeSelector 是否启用 Epoll IO 模型， Linux 环境建议开启。
+     */
     private int listenPort = 8888;
     private int serverWorkerThreads = 8;
     private int serverCallbackExecutorThreads = 0;

@@ -149,10 +149,11 @@ public class BrokerConfig {
     private boolean enablePropertyFilter = false;
 
     private boolean compressedRegister = false;
-
+    // 是否强制注册 broker 到 NameServer
     private boolean forceRegister = true;
 
     /**
+     * Broker 向 NameServer 定时注册的时间间隔
      * This configurable item defines interval of topics registration of broker to name server. Allowing values are
      * between 10, 000 and 60, 000 milliseconds.
      */

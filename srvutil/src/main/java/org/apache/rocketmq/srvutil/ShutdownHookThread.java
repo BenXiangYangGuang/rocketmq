@@ -23,6 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * 系统 ShutDown 的钩子，用来系统宕机之前，关闭资源
  * {@link ShutdownHookThread} is the standard hook for filtersrv and namesrv modules.
  * Through {@link Callable} interface, this hook can customization operations in anywhere.
  */

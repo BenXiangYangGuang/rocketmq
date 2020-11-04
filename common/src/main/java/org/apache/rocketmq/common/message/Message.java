@@ -22,6 +22,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * {topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=3437, CONSUME_START_TIME=1601275494592, UNIQ_KEY=0A0116BE573918B4AAC28E35DCBE02F0, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 55, 53, 50], transactionId='null'}
+ */
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
 

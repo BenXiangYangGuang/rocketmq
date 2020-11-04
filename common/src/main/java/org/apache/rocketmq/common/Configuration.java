@@ -28,6 +28,9 @@ import java.util.Properties;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * 配置类
+ */
 public class Configuration {
 
     private final InternalLogger log;
@@ -89,6 +92,7 @@ public class Configuration {
     }
 
     /**
+     * 注册配置属性到所有的配置中。
      * register config properties
      *
      * @return the current Configuration object
@@ -97,7 +101,7 @@ public class Configuration {
         if (extProperties == null) {
             return this;
         }
-
+        // 上锁
         try {
             readWriteLock.writeLock().lockInterruptibly();
 
@@ -274,7 +278,7 @@ public class Configuration {
 
         return stringBuilder.toString();
     }
-
+    // 配置属性合并
     private void merge(Properties from, Properties to) {
         for (Object key : from.keySet()) {
             Object fromObj = from.get(key), toObj = to.get(key);

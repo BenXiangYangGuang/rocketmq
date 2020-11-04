@@ -63,6 +63,7 @@ public class BrokerOuterAPI {
     private final RemotingClient remotingClient;
     private final TopAddressing topAddressing = new TopAddressing(MixAll.getWSAddr());
     private String nameSrvAddr = null;
+    // 注册 Broker 到 NameServer 服务线程池
     private BrokerFixedThreadPoolExecutor brokerOuterExecutor = new BrokerFixedThreadPoolExecutor(4, 10, 1, TimeUnit.MINUTES,
         new ArrayBlockingQueue<Runnable>(32), new ThreadFactoryImpl("brokerOutApi_thread_", true));
 
@@ -110,7 +111,7 @@ public class BrokerOuterAPI {
 
         this.remotingClient.updateNameServerAddressList(lst);
     }
-
+    // Broker 向所有的 NameServer 服务器发送心跳包
     public List<RegisterBrokerResult> registerBrokerAll(
         final String clusterName,
         final String brokerAddr,
@@ -122,10 +123,30 @@ public class BrokerOuterAPI {
         final boolean oneway,
         final int timeoutMills,
         final boolean compressed) {
-
+        // 当前 Broker 向 NameServer 服务器们的注册结果集合
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
+            // 构建注册请求
+            //
+            /**
+
+             RocketMQ 网络传输基于 Netty 具体网络实现细节本书不会过细去剖析，在这里介绍一下网络跟踪方法：
+             每一个请求，RocketMQ 都会定义一个 RequestCode，然后再服务端会对应相应的网络处理器(processor 包中)，只需整库搜索 RequestCode 即可找到相应的处理逻辑。
+
+             发送心跳包具体逻辑，首先封装请求包头 Header
+             brokerAddr：broker 地址
+             brokerId：brokerId:0:Master;大于 0:Slave
+             brokerName: broker 名称
+             clusterName: 集群名称
+             haServerAddr：master地址，初次请求时该值为空，slave 向 NameServer 注册后返回。
+             requestBody:
+                filterServerList:消息过滤服务器列表。
+                topicConfigWrapper: 主题配置， opicConfigWrapper 内部封装的是 TopicConfigManager 中的 topicConfigTable，
+                    内部存储的是 Broker 启动时默认的一些Topic, MixAll.SELF_TEST_TOPIC、 MixAll.DEFAULT_TOPIC(AutoCreateTopicEnable=true)、
+                    MixAll.BENCHMARK_TOPIC、MixAll.OFFSET_MOVED_EVENT、 BrokerConfig#brokerClusterName、 BrokerConfig#brokerName。
+                    Broker 中 Topic 默认存储在${Rocket_Home}/store/confg/topic.json 中。
+             */
 
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
             requestHeader.setBrokerAddr(brokerAddr);
@@ -142,12 +163,15 @@ public class BrokerOuterAPI {
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
+            // 遍历所有 NameServer 列表
             for (final String namesrvAddr : nameServerAddressList) {
+                // 一个 NameServer 服务器，一个注册线程
                 brokerOuterExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            RegisterBrokerResult result = registerBroker(namesrvAddr,oneway, timeoutMills,requestHeader,body);
+                            // 注册 Broker和注册结果
+                            RegisterBrokerResult result = registerBroker(namesrvAddr,oneway, timeoutMills,requestHeader,body); // 分别向NameServer 发送心跳包
                             if (result != null) {
                                 registerBrokerResultList.add(result);
                             }
@@ -190,7 +214,7 @@ public class BrokerOuterAPI {
             }
             return null;
         }
-
+        // Broker 向 NameServer 发送注册请求
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
         assert response != null;
         switch (response.getCode()) {

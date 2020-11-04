@@ -17,6 +17,9 @@
 
 package org.apache.rocketmq.common.protocol;
 
+/**
+ * Netty 网络类型请求标识
+ */
 public class RequestCode {
 
     public static final int SEND_MESSAGE = 10;
@@ -85,7 +88,7 @@ public class RequestCode {
     public static final int GET_KV_CONFIG = 101;
 
     public static final int DELETE_KV_CONFIG = 102;
-
+    // Broker 向 NameServer 注册，发送心跳包
     public static final int REGISTER_BROKER = 103;
 
     public static final int UNREGISTER_BROKER = 104;

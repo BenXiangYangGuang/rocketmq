@@ -28,9 +28,9 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 public interface RemotingClient extends RemotingService {
 
     void updateNameServerAddressList(final List<String> addrs);
-
+    // 获取所有 NameServer 地址请求
     List<String> getNameServerAddressList();
-
+    // Broker 向 NameServer 服务器发送请求
     RemotingCommand invokeSync(final String addr, final RemotingCommand request,
         final long timeoutMillis) throws InterruptedException, RemotingConnectException,
         RemotingSendRequestException, RemotingTimeoutException;
