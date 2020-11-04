@@ -397,7 +397,7 @@ public class RouteInfoManager {
             }
         }
     }
-
+    // 从路由表 topicQueueTable、brokerAddrTable、filterServerTable 中分别填充 TopicRouteData 中的 List<QueueData> 、List<BrokerData> 和 filterServer 地址表
     public TopicRouteData pickupTopicRouteData(final String topic) {
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;
