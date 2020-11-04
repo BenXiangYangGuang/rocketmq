@@ -452,17 +452,22 @@ public class RouteInfoManager {
 
         return null;
     }
+    // RocketMQ 两个触发点来触发路由删除
+    // 1 ) NameServer 定时扫描 brokerLiveTable 检测上次心跳包与前系统时间的时间差，如果时间戳大于 120s ，则需要移除 Broker 信息
+    // 2 ) Broker 在正常被关闭的情况下，会执行 unregisterBroker 命令。
+
     // 每隔 10 秒，扫描一次 brokerLiveTable，如果连续 120s 没有有收到心跳包， NameServer 将移除该 Broker 的路由信息，同时关闭 Socket 连接。
     public void scanNotActiveBroker() {
         Iterator<Entry<String, BrokerLiveInfo>> it = this.brokerLiveTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<String, BrokerLiveInfo> next = it.next();
             long last = next.getValue().getLastUpdateTimestamp();
+            // 超过 120秒，移除 Broker，关闭 Socket 连接
             if ((last + BROKER_CHANNEL_EXPIRED_TIME) < System.currentTimeMillis()) {
                 RemotingUtil.closeChannel(next.getValue().getChannel());
                 it.remove();
                 log.warn("The broker channel expired, {} {}ms", next.getKey(), BROKER_CHANNEL_EXPIRED_TIME);
-                // 关闭 Socket 连接
+                // 关闭 Socket 连接，更新topicQueueTable、brokerAddrTable、brokerLiveTable、filterServerTable
                 this.onChannelDestroy(next.getKey(), next.getValue().getChannel());
             }
         }
@@ -501,9 +506,14 @@ public class RouteInfoManager {
 
             try {
                 try {
+                    // Step1：申请写锁，根据 brokerAddress 从 brokerLiveTable、filterServerTable移除
                     this.lock.writeLock().lockInterruptibly();
                     this.brokerLiveTable.remove(brokerAddrFound);
                     this.filterServerTable.remove(brokerAddrFound);
+
+                    // Step2 ：维护 brokerAddrTable。 遍历从 HashMap<String /* brokerName */， BrokerData> brokerAddrTable，
+                    // 从 BrokerData 的 HashMap<Long/* broker*/， String /* broker address */> brokerAddrs 中，找到具体的 Broker，
+                    // 从 BrokerData 移除 ，如果移除后在 BrokerData 中不再包含其他 Broker ，则 brokerAddrTable 中移除该 brokerName 对应的条目
                     String brokerNameFound = null;
                     boolean removeBrokerName = false;
                     Iterator<Entry<String, BrokerData>> itBrokerAddrTable =
@@ -532,7 +542,7 @@ public class RouteInfoManager {
                                     brokerData.getBrokerName());
                         }
                     }
-
+                    // Step3:根据 BrokerName,从 clusterAddrTable 中找到 Broker 并从集群中移除。如果移除后，集群中不包含任何 Broker，则将该集群从 clusterAddrTable 中移除。
                     if (brokerNameFound != null && removeBrokerName) {
                         Iterator<Entry<String, Set<String>>> it = this.clusterAddrTable.entrySet().iterator();
                         while (it.hasNext()) {
@@ -554,7 +564,7 @@ public class RouteInfoManager {
                             }
                         }
                     }
-
+                    // Step4: 根据 brokerName，遍历所有主题的队列，如果队列中包含了当前 Broker 的队列，则移除，如果 topic 只包含待移除Broker 的队列的话，从路由表中删除该 topic
                     if (removeBrokerName) {
                         Iterator<Entry<String, List<QueueData>>> itTopicQueueTable =
                                 this.topicQueueTable.entrySet().iterator();
@@ -581,6 +591,7 @@ public class RouteInfoManager {
                         }
                     }
                 } finally {
+                    // step5：释放锁，完成路由删除
                     this.lock.writeLock().unlock();
                 }
             } catch (Exception e) {

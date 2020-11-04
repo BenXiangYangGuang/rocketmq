@@ -58,6 +58,9 @@ import org.apache.rocketmq.remoting.netty.AsyncNettyRequestProcessor;
 import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ *
+ */
 public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implements NettyRequestProcessor {
     private static InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
@@ -66,7 +69,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
     public DefaultRequestProcessor(NamesrvController namesrvController) {
         this.namesrvController = namesrvController;
     }
-
+    // 接受 Broker 客户端请求，requestCode 处理相应的请求
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {

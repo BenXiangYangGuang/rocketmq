@@ -93,7 +93,7 @@ public class NamesrvController {
         // 业务线程池
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
-
+        // 注册网络请求处理器
         this.registerProcessor();
         // 每隔 10 秒，扫描一次 brokerLiveTable，如果连续 120s 没有有收到心跳包， NameServer 将移除该 Broker 的路由信息，同时关闭 Socket 连接。
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -153,7 +153,7 @@ public class NamesrvController {
 
         return true;
     }
-
+    // 注册网络请求处理器
     private void registerProcessor() {
         if (namesrvConfig.isClusterTest()) {
 
