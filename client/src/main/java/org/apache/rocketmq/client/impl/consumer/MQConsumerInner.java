@@ -41,7 +41,7 @@ public interface MQConsumerInner {
     void doRebalance();
 
     void persistConsumerOffset();
-
+    // 更新 topic 的订阅信息列表
     void updateTopicSubscribeInfo(final String topic, final Set<MessageQueue> info);
 
     boolean isSubscribeTopicNeedUpdate(final String topic);

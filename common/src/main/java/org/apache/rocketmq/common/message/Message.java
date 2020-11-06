@@ -30,7 +30,10 @@ public class Message implements Serializable {
 
     private String topic;
     private int flag;
-    //{MIN_OFFSET=0, MAX_OFFSET=3490, CONSUME_START_TIME=1601275494759, UNIQ_KEY=0A0116BE573918B4AAC28E35DD6503D5, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}
+    // {MIN_OFFSET=0, MAX_OFFSET=3490, CONSUME_START_TIME=1601275494759, UNIQ_KEY=0A0116BE573918B4AAC28E35DD6503D5, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}
+    // WAIT 等待消息存储OK
+    // TAGS 消息过滤标签
+    // UNIO_KEY Message 索引键，RocketMQ 可以根据这些 key 快速索引到消息
     private Map<String, String> properties;
     private byte[] body;
     private String transactionId;

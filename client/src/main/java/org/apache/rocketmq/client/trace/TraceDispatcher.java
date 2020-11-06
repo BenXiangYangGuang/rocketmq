@@ -21,6 +21,7 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import java.io.IOException;
 
 /**
+ * 异步转化数据接口
  * Interface of asynchronous transfer data
  */
 public interface TraceDispatcher {

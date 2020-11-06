@@ -25,6 +25,9 @@ import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
 
+/**
+ * MQClientInstance 管理者
+ */
 public class MQClientManager {
     private final static InternalLogger log = ClientLogger.getLog();
     private static MQClientManager instance = new MQClientManager();
@@ -45,6 +48,11 @@ public class MQClientManager {
     }
 
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
+        // 创建 clientId = 客户端IP + instance + (unitname 可选)
+        // 一个服务器部署连个应用程序，应用程序 clientId 相同问题？
+        // 避免这个问题，如果 instance 为默认值 DEFAULT 的话，RocketMQ 会自动将 instance 设置为 进程ID，这样避免了不同进程的相互影响；
+        // 但同一个 JVM 中的不同消费者和不同生产者在启动时获取到的 MQClientInstance 实例都是同一个。
+        // MQClientInstance 封装了 RocketMQ 网络处理 API，是消息生产者（Producer)、消息消费者（Consumer）与 NameServer、Broker 打交道的网络通道。
         String clientId = clientConfig.buildMQClientId();
         MQClientInstance instance = this.factoryTable.get(clientId);
         if (null == instance) {
