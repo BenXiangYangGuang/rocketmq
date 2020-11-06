@@ -97,9 +97,12 @@ public class MQClientInstance {
     private final NettyClientConfig nettyClientConfig;
     private final MQClientAPIImpl mQClientAPIImpl;
     private final MQAdminImpl mQAdminImpl;
+    // topic 下的路由信息集合
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
+    // 更新本地 TopicPublishInfo 路由信息表锁
     private final Lock lockNamesrv = new ReentrantLock();
     private final Lock lockHeartbeat = new ReentrantLock();
+    // 更新 broker 的地址信息
     private final ConcurrentMap<String/* Broker Name */, HashMap<Long/* brokerId */, String/* address */>> brokerAddrTable =
         new ConcurrentHashMap<String, HashMap<Long, String>>();
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable =
@@ -157,6 +160,12 @@ public class MQClientInstance {
             MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION), RemotingCommand.getSerializeTypeConfigInThisServer());
     }
 
+    /**
+     * TopicRouteData 信息更新为 TopicPublishInfo 信息
+     * @param topic
+     * @param route
+     * @return
+     */
     public static TopicPublishInfo topicRouteData2TopicPublishInfo(final String topic, final TopicRouteData route) {
         TopicPublishInfo info = new TopicPublishInfo();
         info.setTopicRouteData(route);
@@ -612,7 +621,7 @@ public class MQClientInstance {
                 try {
                     TopicRouteData topicRouteData;
                     // 如果 isDefault 为 true，则使用默认主题去查询，如果查询到路由信息，则替换路由信息中读写队列个数为消息生产者默认的队列个数(defaultTopicQueueNums);
-                    // 如果 isDefault 为 false，则使用参数 topic 去查询；如果为查询到路由信息，则返回 false，表示路由信息未变化。
+                    // 如果 isDefault 为 false，则使用参数 topic 去查询；如果未查询到路由信息，则返回 false，表示路由信息未变化。
                     if (isDefault && defaultMQProducer != null) {
                         // defaultMQProducer.getCreateTopicKey() 创建默认 topic，查询路由信息
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
@@ -635,7 +644,7 @@ public class MQClientInstance {
                         boolean changed = topicRouteDataIsChange(old, topicRouteData);
                         // 没有改变
                         if (!changed) {
-                            // 更新 MQClientInstance Broker 地址缓存表
+                            // 判断是否需要更新topic 的地址缓存表
                             changed = this.isNeedUpdateTopicRouteInfo(topic);
                         } else {
                             log.info("the topic[{}] route info changed, old[{}] ,new[{}]", topic, old, topicRouteData);
@@ -648,8 +657,6 @@ public class MQClientInstance {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
                             // 根据 topicRouteData 中的 List<QueueData> 转换成 topicPublishInfo 的 List<MessageQueue> 列表。
-                            // DefaultMQProducerImpl
-                            // 最后会更新该 MQClientInstance 所管辖的所有消息发送关于 topic 的路由信息。
                             // Update Pub info
                             {
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
@@ -659,7 +666,7 @@ public class MQClientInstance {
                                     Entry<String, MQProducerInner> entry = it.next();
                                     MQProducerInner impl = entry.getValue();
                                     if (impl != null) {
-                                        // ConcurrentMap<String/* topic */, TopicPublishInfo> topicPublishInfoTable
+                                        // topic 下的路由信息集合 ConcurrentMap<String/* topic */, TopicPublishInfo> topicPublishInfoTable
                                         impl.updateTopicPublishInfo(topic, publishInfo);
                                     }
                                 }

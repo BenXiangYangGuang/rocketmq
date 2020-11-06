@@ -19,6 +19,9 @@ package org.apache.rocketmq.client.common;
 
 import java.util.Random;
 
+/**
+ * 私有线程 变量计数器
+ */
 public class ThreadLocalIndex {
     private final ThreadLocal<Integer> threadLocalIndex = new ThreadLocal<Integer>();
     private final Random random = new Random();

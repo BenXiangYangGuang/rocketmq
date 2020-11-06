@@ -34,7 +34,7 @@ public interface MQProducerInner {
         final String addr,
         final MessageExt msg,
         final CheckTransactionStateRequestHeader checkRequestHeader);
-
+    // 更新 topic 下的路由信息集合
     void updateTopicPublishInfo(final String topic, final TopicPublishInfo info);
 
     boolean isUnitMode();

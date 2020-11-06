@@ -98,6 +98,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private final InternalLogger log = ClientLogger.getLog();
     private final Random random = new Random();
     private final DefaultMQProducer defaultMQProducer;
+    // topic 下的路由信息集合
     private final ConcurrentMap<String/* topic */, TopicPublishInfo> topicPublishInfoTable =
         new ConcurrentHashMap<String, TopicPublishInfo>();
     private final ArrayList<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
@@ -414,7 +415,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
         this.checkExecutor.submit(request);
     }
-
+    // 更新 topic 下的路由信息集合
     @Override
     public void updateTopicPublishInfo(final String topic, final TopicPublishInfo info) {
         if (info != null && topic != null) {
@@ -544,13 +545,20 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     /**
      * 选择要发送的 MessageQueue
      * @param tpInfo
-     * @param lastBrokerName
+     * @param lastBrokerName zuihou
      * @return
      */
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
         return this.mqFaultStrategy.selectOneMessageQueue(tpInfo, lastBrokerName);
     }
 
+    /**
+     * 将此 broker 机器进行隔离，隔离一段时间，隔离时间需要计算
+     * @param brokerName broker 名称
+     * @param currentLatency 本次消息发送延迟时间 currentLatency
+     * @param isolation 是否隔离，隔离为 true，隔离时间为30s为基础进行隔离时间的计算；否则隔离时间为： 上次发送消息的延迟时长为基础进行隔离时间的计算
+     *
+     */
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
         this.mqFaultStrategy.updateFaultItem(brokerName, currentLatency, isolation);
     }
@@ -565,7 +573,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     /**
-     * 发送消息
+     * 同步发送消息
      * @param msg
      * @param communicationMode
      * @param sendCallback
@@ -592,6 +600,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         long endTimestamp = beginTimestampFirst;
         // 查找 topic 路由信息
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
+        // 存在路由信息
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
             boolean callTimeout = false;
             MessageQueue mq = null;
@@ -623,6 +632,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
+                        // 上述代码如果发送过程中抛出异常，调用 updateFaultItem，将这个 broker 隔离一定时长
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
                         switch (communicationMode) {
                             case ASYNC:
@@ -719,7 +729,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
             throw mqClientException;
         }
-
+        // 不存在路由信息分支
+        // 校验 NameServer 配置
         validateNameServerSetting();
 
         throw new MQClientException("No route info of this topic: " + msg.getTopic() + FAQUrl.suggestTodo(FAQUrl.NO_TOPIC_ROUTE_INFO),
@@ -738,17 +749,19 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private TopicPublishInfo tryToFindTopicPublishInfo(final String topic) {
         TopicPublishInfo topicPublishInfo = this.topicPublishInfoTable.get(topic);
         if (null == topicPublishInfo || !topicPublishInfo.ok()) {
+            // 存储这个 TopicPublishInfo
             this.topicPublishInfoTable.putIfAbsent(topic, new TopicPublishInfo());
             // 第一次发送消息时，本地没有缓存 topic 路由信息，查询NameServer 尝试获取，如果路由信息未找到，在次尝试用默认主题 DefaultMQProducerImpl#createTopicKey 去查询，
             // 如果 BrokerConfig#autoCreateTopicEnable 为 true时，NameServer 将返回路由信息，如果 autoCreateTopicEnable 为false，将抛出无法找到 topic 路由异常。
-            // updateTopicRouteInfoFromNameServer 方法时消息生产者更新和维护路由缓存
+            // updateTopicRouteInfoFromNameServer 方法 为消息生产者更新和维护路由缓存
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
         }
-
+        // 包含路由信息或 messageQueueList 存在且 messageQueueList 不为空
         if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {
             return topicPublishInfo;
         } else {
+            // 从 NameServer 获取路由信息并更新路由信息表 topicPublishInfoTable
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
             return topicPublishInfo;
