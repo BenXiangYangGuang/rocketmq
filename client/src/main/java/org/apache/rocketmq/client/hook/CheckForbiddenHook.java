@@ -19,6 +19,9 @@ package org.apache.rocketmq.client.hook;
 
 import org.apache.rocketmq.client.exception.MQClientException;
 
+/**
+ * 消息发送之前，检测禁止钩子
+ */
 public interface CheckForbiddenHook {
     String hookName();
 

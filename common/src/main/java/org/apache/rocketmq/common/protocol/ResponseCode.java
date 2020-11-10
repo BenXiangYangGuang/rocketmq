@@ -28,13 +28,13 @@ public class ResponseCode extends RemotingSysResponseCode {
     public static final int FLUSH_SLAVE_TIMEOUT = 12;
 
     public static final int MESSAGE_ILLEGAL = 13;
-
+    // 服务不可用
     public static final int SERVICE_NOT_AVAILABLE = 14;
 
     public static final int VERSION_NOT_SUPPORTED = 15;
-
+    // 没有权限
     public static final int NO_PERMISSION = 16;
-
+    // 发送 broker 消息失败，topic 不存在
     public static final int TOPIC_NOT_EXIST = 17;
     public static final int TOPIC_EXIST_ALREADY = 18;
     public static final int PULL_NOT_FOUND = 19;

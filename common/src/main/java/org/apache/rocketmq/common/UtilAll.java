@@ -306,7 +306,7 @@ public class UtilAll {
 
         return result;
     }
-
+    // 消息压缩
     public static byte[] compress(final byte[] src, final int level) throws IOException {
         byte[] result = src;
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(src.length);

@@ -81,6 +81,15 @@ public class NamespaceUtil {
         return resourceWithNamespace;
     }
 
+    /**
+     * 对 topic 进行包装，包装了需要特殊处理的 topic： "%RETRY%"、"%DLQ%"，进行消息的特殊处理，比如 重试、死信队列 topic
+     *
+     * 死信队列（Dead Letter Queue）
+     *
+     * @param namespace
+     * @param resourceWithOutNamespace
+     * @return
+     */
     public static String wrapNamespace(String namespace, String resourceWithOutNamespace) {
         if (StringUtils.isEmpty(namespace) || StringUtils.isEmpty(resourceWithOutNamespace)) {
             return resourceWithOutNamespace;
@@ -92,15 +101,15 @@ public class NamespaceUtil {
 
         String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resourceWithOutNamespace);
         StringBuilder stringBuilder = new StringBuilder();
-
+        // 包装重试队列前缀
         if (isRetryTopic(resourceWithOutNamespace)) {
             stringBuilder.append(MixAll.RETRY_GROUP_TOPIC_PREFIX);
         }
-
+        // 包装重试队列后缀
         if (isDLQTopic(resourceWithOutNamespace)) {
             stringBuilder.append(MixAll.DLQ_GROUP_TOPIC_PREFIX);
         }
-
+        // append 队列分隔符
         return stringBuilder.append(namespace).append(NAMESPACE_SEPARATOR).append(resourceWithoutRetryAndDLQ).toString();
 
     }

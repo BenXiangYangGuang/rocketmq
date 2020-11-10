@@ -359,7 +359,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         msg.setSysFlag(sysFlag);
         return true;
     }
-
+    // broker 接受发送消息的处理
     private RemotingCommand sendMessage(final ChannelHandlerContext ctx,
                                         final RemotingCommand request,
                                         final SendMessageContext sendMessageContext,
@@ -383,6 +383,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         }
 
         response.setCode(-1);
+        // 消息检查
         super.msgCheck(ctx, requestHeader, response);
         if (response.getCode() != -1) {
             return response;
@@ -400,7 +401,8 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(requestHeader.getTopic());
         msgInner.setQueueId(queueIdInt);
-
+        // 如果消息重试次数超过循序的最大重试次数，消息将进入到 DLD 延迟队列。
+        // 延迟队列主题：%DLQ% + 消费组名，延迟队列在消息消费重点介绍
         if (!handleRetryAndDLQ(requestHeader, response, request, msgInner, topicConfig)) {
             return response;
         }
@@ -429,9 +431,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             }
             putMessageResult = this.brokerController.getTransactionalMessageService().prepareMessage(msgInner);
         } else {
+            // 最后进行消息的存储
             putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);
         }
-
+        // 处理存储结果
         return handlePutMessageResult(putMessageResult, response, request, msgInner, responseHeader, sendMessageContext, ctx, queueIdInt);
 
     }

@@ -511,7 +511,7 @@ public class MessageDecoder {
 
         return message;
     }
-
+    //将多条消息的消息体body聚合成一个 byte[]数值，在消息服务端能够从该byte[]数值中正确解析出消息即可。
     public static byte[] encodeMessages(List<Message> messages) {
         //TO DO refactor, accumulate in one buffer, avoid copies
         List<byte[]> encodedMessages = new ArrayList<byte[]>(messages.size());

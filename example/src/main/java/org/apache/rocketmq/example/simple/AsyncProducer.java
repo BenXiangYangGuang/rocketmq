@@ -32,9 +32,9 @@ public class AsyncProducer {
 
         DefaultMQProducer producer = new DefaultMQProducer("Jodie_Daily_test");
         producer.start();
-        producer.setRetryTimesWhenSendAsyncFailed(0);
+        producer.setRetryTimesWhenSendAsyncFailed(2);
 
-        int messageCount = 100;
+        /*int messageCount = 100;
         final CountDownLatch countDownLatch = new CountDownLatch(messageCount);
         for (int i = 0; i < messageCount; i++) {
             try {
@@ -61,7 +61,29 @@ public class AsyncProducer {
                 e.printStackTrace();
             }
         }
-        countDownLatch.await(5, TimeUnit.SECONDS);
+        countDownLatch.await(5, TimeUnit.SECONDS);*/
+        try {
+            final int index = 1;
+            Message msg = new Message("Jodie_topic_1023",
+                    "TagA",
+                    "OrderID188",
+                    "Hello world".getBytes(RemotingHelper.DEFAULT_CHARSET));
+            producer.send(msg, new SendCallback() {
+                @Override
+                public void onSuccess(SendResult sendResult) {
+                    System.out.printf("%-10d OK %s %n", index, sendResult.getMsgId());
+                }
+
+                @Override
+                public void onException(Throwable e) {
+                    System.out.printf("%-10d Exception %s %n", index, e);
+                    e.printStackTrace();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        Thread.sleep(10000);
         producer.shutdown();
     }
 }

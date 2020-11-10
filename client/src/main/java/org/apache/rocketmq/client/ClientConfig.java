@@ -97,7 +97,7 @@ public class ClientConfig {
             this.instanceName = String.valueOf(UtilAll.getPid());
         }
     }
-
+    //  对 topic 进行包装，包装了需要特殊处理的 topic： "%RETRY%"、"%DLQ%"，进行消息的特殊处理，比如重试
     public String withNamespace(String resource) {
         return NamespaceUtil.wrapNamespace(this.getNamespace(), resource);
     }

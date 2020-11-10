@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.common.help;
-
+// 常见问题错误地址集合
 public class FAQUrl {
 
     public static final String APPLY_TOPIC_URL =
@@ -60,7 +60,7 @@ public class FAQUrl {
 
     private static final String TIP_STRING_BEGIN = "\nSee ";
     private static final String TIP_STRING_END = " for further details.";
-
+    // 建议查看的解决问题的网页
     public static String suggestTodo(final String url) {
         StringBuilder sb = new StringBuilder();
         sb.append(TIP_STRING_BEGIN);
