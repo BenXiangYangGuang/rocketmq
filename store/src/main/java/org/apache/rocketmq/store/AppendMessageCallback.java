@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import org.apache.rocketmq.common.message.MessageExtBatch;
 
 /**
+ * 写消息，回调函数接口
  * Write messages callback interface
  */
 public interface AppendMessageCallback {

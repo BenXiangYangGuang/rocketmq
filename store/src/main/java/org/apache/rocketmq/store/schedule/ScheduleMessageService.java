@@ -61,6 +61,7 @@ public class ScheduleMessageService extends ConfigManager {
     private final AtomicBoolean started = new AtomicBoolean(false);
     private Timer timer;
     private MessageStore writeMessageStore;
+    // 消息最大延迟级别
     private int maxDelayLevel;
 
     public ScheduleMessageService(final DefaultMessageStore defaultMessageStore) {

@@ -17,12 +17,15 @@
 package org.apache.rocketmq.store;
 
 /**
+ * 消息写入到 commitlog 文件映射的内存 mappedFile 返回结果
  * When write a message to the commit log, returns results
  */
 public class AppendMessageResult {
     // Return code
+    // 消息追加到 mappedFile 映射的内存 buffer，写入结果
     private AppendMessageStatus status;
     // Where to start writing
+    // 消息的物理偏移量
     private long wroteOffset;
     // Write Bytes
     private int wroteBytes;
@@ -31,9 +34,11 @@ public class AppendMessageResult {
     // Message storage timestamp
     private long storeTimestamp;
     // Consume queue's offset(step by one)
+    // 消息消费队列逻辑偏移量，类似于数组下表，在consume queue 的偏移量，下表
     private long logicsOffset;
+    // 当前未使用
     private long pagecacheRT = 0;
-
+    // 消息条数，批量消息发送时消息条数
     private int msgNum = 1;
 
     public AppendMessageResult(AppendMessageStatus status) {

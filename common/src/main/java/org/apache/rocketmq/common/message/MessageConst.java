@@ -23,6 +23,7 @@ public class MessageConst {
     public static final String PROPERTY_TAGS = "TAGS";
     // 等待消息存储
     public static final String PROPERTY_WAIT_STORE_MSG_OK = "WAIT";
+    // 消息延迟级别
     public static final String PROPERTY_DELAY_TIME_LEVEL = "DELAY";
     public static final String PROPERTY_RETRY_TOPIC = "RETRY_TOPIC";
     public static final String PROPERTY_REAL_TOPIC = "REAL_TOPIC";

@@ -19,8 +19,12 @@ package org.apache.rocketmq.store;
 import org.apache.rocketmq.common.TopicFilterType;
 import org.apache.rocketmq.common.message.MessageExt;
 
+/**
+ * broker 内存处理的消息
+ */
 public class MessageExtBrokerInner extends MessageExt {
     private static final long serialVersionUID = 7256001576878700634L;
+    // 属性消息字符串
     private String propertiesString;
     private long tagsCode;
 

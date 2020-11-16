@@ -48,6 +48,7 @@ public class MappedFile extends ReferenceResource {
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
 
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+    // 即将写入消息的mappedFile 的位置
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
@@ -187,7 +188,7 @@ public class MappedFile extends ReferenceResource {
     public FileChannel getFileChannel() {
         return fileChannel;
     }
-
+    // 追加消息到 mappedFile 文件中
     public AppendMessageResult appendMessage(final MessageExtBrokerInner msg, final AppendMessageCallback cb) {
         return appendMessagesInner(msg, cb);
     }
@@ -195,14 +196,16 @@ public class MappedFile extends ReferenceResource {
     public AppendMessageResult appendMessages(final MessageExtBatch messageExtBatch, final AppendMessageCallback cb) {
         return appendMessagesInner(messageExtBatch, cb);
     }
-
+    // 追加消息到 mappedFile 文件中
     public AppendMessageResult appendMessagesInner(final MessageExt messageExt, final AppendMessageCallback cb) {
         assert messageExt != null;
         assert cb != null;
-
+        // 当前消息写入的位置
         int currentPos = this.wrotePosition.get();
-
+        // 如果位置超过文件大小，抛出 UNKNOWN_ERROR 未知错误异常；
+        // 小于文件大小，进行消息存储
         if (currentPos < this.fileSize) {
+            // slice 薄片，创建一个与 MappedFile 的共享内存区，并设置 position 当前指针。
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;
@@ -213,6 +216,7 @@ public class MappedFile extends ReferenceResource {
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            // 更新消息队列，逻辑偏移量
             this.wrotePosition.addAndGet(result.getWroteBytes());
             this.storeTimestamp = result.getStoreTimestamp();
             return result;

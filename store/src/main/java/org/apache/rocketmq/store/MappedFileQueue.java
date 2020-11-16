@@ -190,7 +190,7 @@ public class MappedFileQueue {
 
         return 0;
     }
-
+    // 获取最后存储消息的映射mappedFile
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
         long createOffset = -1;
         MappedFile mappedFileLast = getLastMappedFile();
@@ -232,7 +232,7 @@ public class MappedFileQueue {
 
         return mappedFileLast;
     }
-
+    // 获取最后存储消息的映射mappedFile
     public MappedFile getLastMappedFile(final long startOffset) {
         return getLastMappedFile(startOffset, true);
     }

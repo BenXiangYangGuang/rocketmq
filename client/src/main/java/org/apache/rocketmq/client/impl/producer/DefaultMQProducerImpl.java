@@ -835,7 +835,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 // 是否压缩
                 boolean msgBodyCompressed = false;
                 if (this.tryToCompressMessage(msg)) {
-                    // sysFlag |= MessageSysFlag.COMPRESSED_FLAG 是 sysFlag = sysFlag | MessageSysFlag.COMPRESSED_FLAG 是 or，或的逻辑
+                    // sysFlag |= MessageSysFlag.COMPRESSED_FLAG 是 sysFlag = sysFlag | MessageSysFlag.COMPRESSED_FLAG | 是 二进制按位 或的意思 or，或的逻辑
+                    // 10 << 1 ,移位运算符，相当于末尾加一个0，乘以 * 2，数字向左移动，扩大一倍
+                    // 10 >> 1 ,移位运算符，相当于末尾移除一个0，除以 * 2，数字向右移动，缩小一倍
                     sysFlag |= MessageSysFlag.COMPRESSED_FLAG;
                     msgBodyCompressed = true;
                 }

@@ -29,6 +29,9 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ *
+ */
 public class StoreStatsService extends ServiceThread {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
@@ -40,7 +43,7 @@ public class StoreStatsService extends ServiceThread {
     };
 
     private static int printTPSInterval = 60 * 1;
-
+    // 存放消息失败次数
     private final AtomicLong putMessageFailedTimes = new AtomicLong(0);
 
     private final ConcurrentMap<String, AtomicLong> putMessageTopicTimesTotal =
@@ -56,13 +59,17 @@ public class StoreStatsService extends ServiceThread {
     private final LinkedList<CallSnapshot> getTimesFoundList = new LinkedList<CallSnapshot>();
     private final LinkedList<CallSnapshot> getTimesMissList = new LinkedList<CallSnapshot>();
     private final LinkedList<CallSnapshot> transferedMsgCountList = new LinkedList<CallSnapshot>();
+    // 存放消息花费时间分布数组
     private volatile AtomicLong[] putMessageDistributeTime;
     private long messageStoreBootTimestamp = System.currentTimeMillis();
+    // 存放消息花费时间的最大市场
     private volatile long putMessageEntireTimeMax = 0;
-    private volatile long getMessageEntireTimeMax = 0;
-    // for putMessageEntireTimeMax
-    private ReentrantLock lockPut = new ReentrantLock();
     // for getMessageEntireTimeMax
+    // for putMessageEntireTimeMax
+    // 存放消息花费时间数组的可读写锁的写锁
+    private ReentrantLock lockPut = new ReentrantLock();
+    private volatile long getMessageEntireTimeMax = 0;
+    // 存放消息花费时间数组的可读写锁的读锁
     private ReentrantLock lockGet = new ReentrantLock();
 
     private volatile long dispatchMaxBuffer = 0;
@@ -91,12 +98,16 @@ public class StoreStatsService extends ServiceThread {
         return putMessageEntireTimeMax;
     }
 
+    /**
+     * 设置存放消息的最大时间
+     * @param value
+     */
     public void setPutMessageEntireTimeMax(long value) {
         final AtomicLong[] times = this.putMessageDistributeTime;
 
         if (null == times)
             return;
-
+        // 存放消息花费时间统计、分类
         // us
         if (value <= 0) {
             times[0].incrementAndGet();
@@ -135,11 +146,13 @@ public class StoreStatsService extends ServiceThread {
         } else {
             times[12].incrementAndGet();
         }
-
+        // 更新 putMessageEntireTimeMax 最大的存放时间
         if (value > this.putMessageEntireTimeMax) {
+            // 获取锁
             this.lockPut.lock();
             this.putMessageEntireTimeMax =
                 value > this.putMessageEntireTimeMax ? value : this.putMessageEntireTimeMax;
+            // 释放锁
             this.lockPut.unlock();
         }
     }

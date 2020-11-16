@@ -40,12 +40,15 @@ public class MessageExt extends Message {
     private long queueOffset;
     private int sysFlag;
     private long bornTimestamp;
+    // 消息诞生地址，producer 所在机器 ip
     private SocketAddress bornHost;
-
+    // broker 存储消息到commitlog 文件中的时间
     private long storeTimestamp;
+    // message 存储地址，broker 地址
     private SocketAddress storeHost;
     private String msgId;
     private long commitLogOffset;
+    // Cyclic redundancy check (循环冗余校验)
     private int bodyCRC;
     private int reconsumeTimes;
 

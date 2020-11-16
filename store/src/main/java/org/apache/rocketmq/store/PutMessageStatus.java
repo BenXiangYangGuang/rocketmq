@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.store;
-
+// 存储消息的broker状态
 public enum PutMessageStatus {
     PUT_OK,
     FLUSH_DISK_TIMEOUT,

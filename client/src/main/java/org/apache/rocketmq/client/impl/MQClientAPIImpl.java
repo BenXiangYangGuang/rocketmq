@@ -537,7 +537,7 @@ public class MQClientAPIImpl {
     }
 
     /**
-     * 异步发送请求
+     * 异步发送请求，异步发送注册回调函数，只有收到 broker 的 response 之后才能进行重试，如果网络异常、网络超时、broker 挂了等因素，没有返回 response，并不会发生发送消息的重试
      * @param addr
      * @param brokerName
      * @param msg
@@ -629,6 +629,22 @@ public class MQClientAPIImpl {
         });
     }
 
+    /**
+     * 异步消息发送异常，进行消息重新发送
+     * @param brokerName
+     * @param msg
+     * @param timeoutMillis
+     * @param request
+     * @param sendCallback
+     * @param topicPublishInfo
+     * @param instance
+     * @param timesTotal
+     * @param curTimes
+     * @param e
+     * @param context
+     * @param needRetry
+     * @param producer
+     */
     private void onExceptionImpl(final String brokerName,
         final Message msg,
         final long timeoutMillis,

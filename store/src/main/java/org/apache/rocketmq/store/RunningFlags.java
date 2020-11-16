@@ -16,6 +16,9 @@
  */
 package org.apache.rocketmq.store;
 
+/**
+ * broker 读写状态
+ */
 public class RunningFlags {
 
     private static final int NOT_READABLE_BIT = 1;

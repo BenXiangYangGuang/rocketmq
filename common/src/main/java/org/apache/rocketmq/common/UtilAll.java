@@ -223,7 +223,7 @@ public class UtilAll {
 
         return -1;
     }
-
+    //循环冗余校验（英语：Cyclic redundancy check，通称“CRC”）是一种根据网络数据包或电脑文件等数据产生简短固定位数校验码的一种散列函数，主要用来检测或校验数据传输或者保存后可能出现的错误。生成的数字在传输或者存储之前计算出来并且附加到数据后面，然后接收方进行检验确定数据是否发生变化。
     public static int crc32(byte[] array) {
         if (array != null) {
             return crc32(array, 0, array.length);
