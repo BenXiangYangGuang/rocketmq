@@ -87,6 +87,11 @@ public class UtilAll {
         return sb.toString();
     }
 
+    /**
+     * 根据 offset 创建 mappedFile 文件名称
+     * @param offset
+     * @return
+     */
     public static String offset2FileName(final long offset) {
         final NumberFormat nf = NumberFormat.getInstance();
         nf.setMinimumIntegerDigits(20);

@@ -31,6 +31,18 @@ import org.apache.rocketmq.store.DefaultMessageStore;
 import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.dledger.DLedgerCommitLog;
 
+/**
+ * openmessaging-storage-dledger:
+ * A raft-based java library for building high-available, high-durable, strong-consistent commitlog, which could act as the persistent layer for distributed storage system,
+ * i.e. messaging, streaming, kv, db, etc.
+ * 基于 raft 协议的、构建高可用、高持久化、强一致性的 commitlog，在分布式存储系统中作为一个持久化层应用。
+ * 功能：
+ * 领导选举
+ * 高性能、高可用的存储支持
+ * leader、followers 之间并行日志copy
+ * commitlog 异步copy
+ *
+ */
 public class DLedgerRoleChangeHandler implements DLedgerLeaderElector.RoleChangeHandler {
 
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);

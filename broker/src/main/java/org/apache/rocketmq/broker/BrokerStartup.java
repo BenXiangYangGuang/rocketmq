@@ -218,7 +218,7 @@ public class BrokerStartup {
                 messageStoreConfig);
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
-
+            // broker 处理各种请求的控制器初始化
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();

@@ -31,14 +31,15 @@ public interface RemotingClient extends RemotingService {
     // 获取所有 NameServer 地址请求
     List<String> getNameServerAddressList();
     // Broker 向 NameServer 服务器发送请求
+    // producer 同步向 broker 发送消息请求
     RemotingCommand invokeSync(final String addr, final RemotingCommand request,
         final long timeoutMillis) throws InterruptedException, RemotingConnectException,
         RemotingSendRequestException, RemotingTimeoutException;
-
+    // producer 调用 netty 服务向 broker 发送异步消息请求
     void invokeAsync(final String addr, final RemotingCommand request, final long timeoutMillis,
         final InvokeCallback invokeCallback) throws InterruptedException, RemotingConnectException,
         RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException;
-
+    // producer 调用 netty 服务向 broker 发送oneWay消息请求
     void invokeOneway(final String addr, final RemotingCommand request, final long timeoutMillis)
         throws InterruptedException, RemotingConnectException, RemotingTooMuchRequestException,
         RemotingTimeoutException, RemotingSendRequestException;

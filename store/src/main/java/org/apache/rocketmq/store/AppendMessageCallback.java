@@ -27,7 +27,7 @@ public interface AppendMessageCallback {
 
     /**
      * After message serialization, write MapedByteBuffer
-     *
+     * maxBlank mappedFile 剩余空间大小
      * @return How many bytes to write
      */
     AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer,

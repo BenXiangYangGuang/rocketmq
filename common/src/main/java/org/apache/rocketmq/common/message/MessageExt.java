@@ -50,6 +50,7 @@ public class MessageExt extends Message {
     private long commitLogOffset;
     // Cyclic redundancy check (循环冗余校验)
     private int bodyCRC;
+    // 消息被消费的次数
     private int reconsumeTimes;
 
     private long preparedTransactionOffset;

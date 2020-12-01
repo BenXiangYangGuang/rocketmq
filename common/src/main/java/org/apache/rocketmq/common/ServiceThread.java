@@ -22,15 +22,22 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * 额外服务的线程，比如 AllocateMappedFileService 提前创建 MappedFile 文件的服务
+ */
 public abstract class ServiceThread implements Runnable {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
 
     private static final long JOIN_TIME = 90 * 1000;
-
+    // 封装的线程
     private Thread thread;
+    // 等待基数点
     protected final CountDownLatch2 waitPoint = new CountDownLatch2(1);
+    // 是否通知线程标志
     protected volatile AtomicBoolean hasNotified = new AtomicBoolean(false);
+    // 线程是否停止
     protected volatile boolean stopped = false;
+    // 是否是守护线程
     protected boolean isDaemon = false;
 
     //Make it able to restart the thread
@@ -42,6 +49,9 @@ public abstract class ServiceThread implements Runnable {
 
     public abstract String getServiceName();
 
+    /**
+     * 开启额外服务线程
+     */
     public void start() {
         log.info("Try to start service thread:{} started:{} lastThread:{}", getServiceName(), started.get(), thread);
         if (!started.compareAndSet(false, true)) {
@@ -53,10 +63,17 @@ public abstract class ServiceThread implements Runnable {
         this.thread.start();
     }
 
+    /**
+     * 关闭额外服务
+     */
     public void shutdown() {
         this.shutdown(false);
     }
 
+    /**
+     * 关闭额外服务
+     * @param interrupt 线程是否可中断
+     */
     public void shutdown(final boolean interrupt) {
         log.info("Try to shutdown service thread:{} started:{} lastThread:{}", getServiceName(), started.get(), thread);
         if (!started.compareAndSet(true, false)) {
@@ -71,11 +88,13 @@ public abstract class ServiceThread implements Runnable {
 
         try {
             if (interrupt) {
+                // 线程自己中断自己，不能被其他线程中断，否则会抛出错误
                 this.thread.interrupt();
             }
 
             long beginTime = System.currentTimeMillis();
             if (!this.thread.isDaemon()) {
+                // 这个线程等待 90 秒自动死亡
                 this.thread.join(this.getJointime());
             }
             long elapsedTime = System.currentTimeMillis() - beginTime;

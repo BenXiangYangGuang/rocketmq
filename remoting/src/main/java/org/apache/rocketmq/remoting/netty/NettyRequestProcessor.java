@@ -20,12 +20,14 @@ import io.netty.channel.ChannelHandlerContext;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 /**
+ * 公共的Netty 远程请求处理器
  * Common remoting command processor
  */
 public interface NettyRequestProcessor {
+    // 接受请求，进行处理
     RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request)
         throws Exception;
-
+    // 拒绝处理请求
     boolean rejectRequest();
 
 }

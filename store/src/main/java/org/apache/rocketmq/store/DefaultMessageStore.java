@@ -99,7 +99,7 @@ public class DefaultMessageStore implements MessageStore {
 
     private final RunningFlags runningFlags = new RunningFlags();
     private final SystemClock systemClock = new SystemClock();
-
+    // 单线程任务执行器
     private final ScheduledExecutorService scheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("StoreScheduledThread"));
     private final BrokerStatsManager brokerStatsManager;
@@ -115,7 +115,7 @@ public class DefaultMessageStore implements MessageStore {
     private AtomicLong printTimes = new AtomicLong(0);
     // CommitLog 文件转发请求
     private final LinkedList<CommitLogDispatcher> dispatcherList;
-
+    // 一个可以读写的 lock 文件
     private RandomAccessFile lockFile;
 
     private FileLock lock;
@@ -154,7 +154,8 @@ public class DefaultMessageStore implements MessageStore {
         this.scheduleMessageService = new ScheduleMessageService(this);
 
         this.transientStorePool = new TransientStorePool(messageStoreConfig);
-
+        // 根据是否开启 transientStorePoolEnable，存在两种初始化情况。
+        // transientStorePoolEnable 为 true 表示内容先存储在对外内存，然后通过 Commit 线程将数据提交到内存映射Buffer中，再通过 Flush 线程将内存映射 Buffer 中的数据持久化到磁盘中。
         if (messageStoreConfig.isTransientStorePoolEnable()) {
             this.transientStorePool.init();
         }
@@ -166,9 +167,11 @@ public class DefaultMessageStore implements MessageStore {
         this.dispatcherList = new LinkedList<>();
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
-
+        // ${RocketMQ_HOME}/store/lock
         File file = new File(StorePathConfigHelper.getLockFile(messageStoreConfig.getStorePathRootDir()));
+        // 确保 fileParent 父目录存在
         MappedFile.ensureDirOK(file.getParent());
+        // 创建一个可以读写的 lock 文件
         lockFile = new RandomAccessFile(file, "rw");
     }
 
@@ -183,6 +186,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
+     * 预热加载 commitlog 文件夹下历史 mappedFile 文件
      * @throws IOException
      */
     public boolean load() {
@@ -191,7 +195,7 @@ public class DefaultMessageStore implements MessageStore {
         try {
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
-
+            // 处理延迟定时消息，加载
             if (null != scheduleMessageService) {
                 result = result && this.scheduleMessageService.load();
             }
@@ -201,7 +205,7 @@ public class DefaultMessageStore implements MessageStore {
 
             // load Consume Queue
             result = result && this.loadConsumeQueue();
-
+            // 监测点
             if (result) {
                 this.storeCheckpoint =
                     new StoreCheckpoint(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
@@ -1569,6 +1573,10 @@ public class DefaultMessageStore implements MessageStore {
         return map.get(queueId);
     }
 
+    /**
+     * 开启新的线程，异步解锁 mappedFile
+     * @param mappedFile
+     */
     public void unlockMappedFile(final MappedFile mappedFile) {
         this.scheduledExecutorService.schedule(new Runnable() {
             @Override

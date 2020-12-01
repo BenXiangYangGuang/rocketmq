@@ -39,7 +39,7 @@ public class StorePathConfigHelper {
     public static String getAbortFile(final String rootDir) {
         return rootDir + File.separator + "abort";
     }
-
+    // ${RocketMQ_HOME}/store/lock
     public static String getLockFile(final String rootDir) {
         return rootDir + File.separator + "lock";
     }

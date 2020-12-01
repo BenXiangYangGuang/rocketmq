@@ -53,18 +53,24 @@ public class CommitLog {
     public final static int MESSAGE_MAGIC_CODE = -626843481;
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     // End of file empty MAGIC CODE cbd43194
+    // 空白结尾的魔术
     protected final static int BLANK_MAGIC_CODE = -875286124;
+    // 映射文件队列，ROCKETMQ_HOME/commitlog 文件夹下的文件对应
     protected final MappedFileQueue mappedFileQueue;
+    // 默认消息存储服务
     protected final DefaultMessageStore defaultMessageStore;
+    // commitLog 刷盘操作
     private final FlushCommitLogService flushCommitLogService;
 
     //If TransientStorePool enabled, we must flush message to FileChannel at fixed periods
+    // 定时将 transientStorePoll 中的直接内存 ByteBuffer，提交条内存映射 MappedByteBuffer 中
     private final FlushCommitLogService commitLogService;
     // 存储消息到 mappedFile 的回调映射
     private final AppendMessageCallback appendMessageCallback;
+    // 消息解码服务线程
     private final ThreadLocal<MessageExtBatchEncoder> batchEncoderThreadLocal;
 
-    // topic-queue-id，offset；消息的key，和在 commitlog 中的 offset，方便消息查询时的索引
+    // topic-queue-id，offset；消息的key，和在 commitlog 中的 offset，方便消息存储时的索引
     protected HashMap<String/* topic-queueid */, Long/* offset */> topicQueueTable = new HashMap<String, Long>(1024);
     protected volatile long confirmOffset = -1L;
 
@@ -73,16 +79,20 @@ public class CommitLog {
     protected final PutMessageLock putMessageLock;
 
     public CommitLog(final DefaultMessageStore defaultMessageStore) {
+        // 在这里组织 commitlog 的对应的 MappedFile 文件，然后进行相应的文件操作，文件映射，刷线到磁盘文件
         this.mappedFileQueue = new MappedFileQueue(defaultMessageStore.getMessageStoreConfig().getStorePathCommitLog(),
             defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog(), defaultMessageStore.getAllocateMappedFileService());
-        this.defaultMessageStore = defaultMessageStore;
 
+        this.defaultMessageStore = defaultMessageStore;
+        // 异步、同步刷盘服务初始化
         if (FlushDiskType.SYNC_FLUSH == defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            // 同步刷盘服务为 GroupCommitService
             this.flushCommitLogService = new GroupCommitService();
         } else {
+            // 异步刷盘服务为 FlushRealTimeService
             this.flushCommitLogService = new FlushRealTimeService();
         }
-
+        // 定时将 transientStorePoll 中的直接内存 ByteBuffer，提交条内存映射 MappedByteBuffer 中
         this.commitLogService = new CommitRealTimeService();
         // 存储消息到 mappedFile 的回调映射
         this.appendMessageCallback = new DefaultAppendMessageCallback(defaultMessageStore.getMessageStoreConfig().getMaxMessageSize());
@@ -92,10 +102,14 @@ public class CommitLog {
                 return new MessageExtBatchEncoder(defaultMessageStore.getMessageStoreConfig().getMaxMessageSize());
             }
         };
+        // putMessage 到 mappedFile 时是否使用可重入锁，默认使用自旋锁
         this.putMessageLock = defaultMessageStore.getMessageStoreConfig().isUseReentrantLockWhenPutMessage() ? new PutMessageReentrantLock() : new PutMessageSpinLock();
 
     }
 
+    /**
+     * @return 加载 mappedFile 文件
+     */
     public boolean load() {
         boolean result = this.mappedFileQueue.load();
         log.info("load commit log " + (result ? "OK" : "Failed"));
@@ -118,6 +132,9 @@ public class CommitLog {
         this.flushCommitLogService.shutdown();
     }
 
+    /**
+     * @return flush
+     */
     public long flush() {
         this.mappedFileQueue.commit(0);
         this.mappedFileQueue.flush(0);
@@ -136,6 +153,14 @@ public class CommitLog {
         return this.mappedFileQueue.remainHowManyDataToFlush();
     }
 
+    /**
+     * 删除失效文件
+     * @param expiredTime
+     * @param deleteFilesInterval
+     * @param intervalForcibly
+     * @param cleanImmediately
+     * @return
+     */
     public int deleteExpiredFile(
         final long expiredTime,
         final int deleteFilesInterval,
@@ -146,17 +171,20 @@ public class CommitLog {
     }
 
     /**
+     * 使用副本读取数据
      * Read CommitLog data, use data replication
      */
     public SelectMappedBufferResult getData(final long offset) {
         return this.getData(offset, offset == 0);
     }
-
+    // 根据 offset 获取，获取 commitlog 中的 mappedFile 中 MappedByteBuffer 内存映射的数据,然后创建副本返回 SelectMappedBufferResult 对象
     public SelectMappedBufferResult getData(final long offset, final boolean returnFirstOnNotFound) {
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog();
+        // 根据offset 获取对应的 mappedFile
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, returnFirstOnNotFound);
         if (mappedFile != null) {
             int pos = (int) (offset % mappedFileSize);
+            // 根据 pos 获取 mappedFile 中 MappedByteBuffer 中的数据
             SelectMappedBufferResult result = mappedFile.selectMappedBuffer(pos);
             return result;
         }
@@ -165,6 +193,7 @@ public class CommitLog {
     }
 
     /**
+     * 正常退出，数据恢复，所有内存数据将会被刷新
      * When the normal exit, data recovery, all memory data have been flush
      */
     public void recoverNormally(long maxPhyOffsetOfConsumeQueue) {
@@ -804,7 +833,7 @@ public class CommitLog {
         msg.setBodyCRC(UtilAll.crc32(msg.getBody()));
         // Back to Results
         AppendMessageResult result = null;
-
+        // 存储服务统计功能服务
         StoreStatsService storeStatsService = this.defaultMessageStore.getStoreStatsService();
         // topic
         String topic = msg.getTopic();
@@ -863,11 +892,12 @@ public class CommitLog {
             // global
             // 消息存储时间，确定消息全局有序
             msg.setStoreTimestamp(beginLockTimestamp);
-            // mappedFile 存储满或者 isnull,
+            //mappedFile==null标识CommitLog文件还未创建，第一次存消息则创建CommitLog文件
+            //mappedFile.isFull()表示mappedFile文件已满，需要重新创建CommitLog文件
             if (null == mappedFile || mappedFile.isFull()) {
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise；新文件，造成脏数据
             }
-            // 创建 mappedFile 失败
+            // mappedFile==null说明创建CommitLog文件失败抛出异常，创建失败可能是磁盘空间不足或者权限不够
             if (null == mappedFile) {
                 log.error("create mapped file1 error, topic: " + msg.getTopic() + " clientAddr: " + msg.getBornHostString());
                 beginTimeInLock = 0;
@@ -878,9 +908,11 @@ public class CommitLog {
             switch (result.getStatus()) {
                 case PUT_OK:
                     break;
+                // 针对一条消息足够长，然后 mappedFile 文件不够存储，需要创建新的 mappedFile 进行消息存放。
                 case END_OF_FILE:
-                    // broker 重新开辟，新的 commitlog 文件
+                    // 上一个 mappedFile 暂存文件，需要解锁这个 mappedFile
                     unlockMappedFile = mappedFile;
+                    // broker 重新开辟，新的 commitlog 文件
                     // Create a new file, re-write the message
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0);
                     if (null == mappedFile) {
@@ -914,8 +946,9 @@ public class CommitLog {
         if (elapsedTimeInLock > 500) {
             log.warn("[NOTIFYME]putMessage in lock cost time(ms)={}, bodyLength={} AppendMessageResult={}", elapsedTimeInLock, msg.getBody().length, result);
         }
-
+        // 上一个有空闲空间，但不够存储消息的 mappedFile 文件，
         if (null != unlockMappedFile && this.defaultMessageStore.getMessageStoreConfig().isWarmMapedFileEnable()) {
+            // 解锁 mappedFile 的内存锁定
             this.defaultMessageStore.unlockMappedFile(unlockMappedFile);
         }
 
@@ -1640,15 +1673,16 @@ public class CommitLog {
                     + ", maxMessageSize: " + this.maxMessageSize);
                 return new AppendMessageResult(AppendMessageStatus.MESSAGE_SIZE_EXCEEDED);
             }
-
+            // 判断 mappedFile 文件是否有足够的空间来存储消息，如果没有足够空间，设置空白魔数标志
             // Determines whether there is sufficient free space
             // maxBlank:消息空闲长度
             // 消息长度+文件结束8个空的字节长度；大于消息空闲长度；返回文件结束的标志
             if ((msgLen + END_FILE_MIN_BLANK_LENGTH) > maxBlank) {
+                // 重置 byteBuffer 内容
                 this.resetByteBuffer(this.msgStoreItemMemory, maxBlank);
                 // 1 TOTALSIZE
                 this.msgStoreItemMemory.putInt(maxBlank);
-                // 2 MAGICCODE
+                // 2 MAGICCODE 空白结尾的魔数
                 this.msgStoreItemMemory.putInt(CommitLog.BLANK_MAGIC_CODE);
                 // 3 The remaining space may be any value
                 // Here the length of the specially set maxBlank
@@ -1707,7 +1741,7 @@ public class CommitLog {
             // 开始存储写入mappedFile 的时间
             final long beginTimeMills = CommitLog.this.defaultMessageStore.now();
             // Write messages to the queue buffer
-            // 写消息内容到 byteBuffer
+            // 写消息内容到 物理内存开辟的 byteBuffer
             byteBuffer.put(this.msgStoreItemMemory.array(), 0, msgLen);
             //返回消息存储 mappedFile 映射的buffer 成功
             AppendMessageResult result = new AppendMessageResult(AppendMessageStatus.PUT_OK, wroteOffset, msgLen, msgId,

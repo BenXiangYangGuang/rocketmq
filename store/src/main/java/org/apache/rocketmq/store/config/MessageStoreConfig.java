@@ -22,6 +22,7 @@ import org.apache.rocketmq.store.ConsumeQueue;
 
 public class MessageStoreConfig {
     //The root directory in which the log data is kept
+    // ${RocketMQ_HOME}/store
     @ImportantField
     private String storePathRootDir = System.getProperty("user.home") + File.separator + "store";
 
@@ -31,6 +32,7 @@ public class MessageStoreConfig {
         + File.separator + "commitlog";
 
     // CommitLog file size,default is 1G
+    // CommitLogFile 文件，也包含 transientStorePool 暂时缓存池，开辟直接内存 ByteBuffer 的大小
     private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
     // ConsumeQueue file size,default is 30W
     private int mappedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
@@ -53,6 +55,7 @@ public class MessageStoreConfig {
     private int commitIntervalCommitLog = 200;
 
     /**
+     * commitlog putMessage 到 mappedFile 时是否使用可重入锁，默认使用自旋锁
      * introduced since 4.0.x. Determine whether to use mutex reentrantLock when putting message.<br/>
      * By default it is set to false indicating using spin lock when putting message.
      */
@@ -91,6 +94,7 @@ public class MessageStoreConfig {
     // How many pages are to be committed when commit data to file
     private int commitCommitLogLeastPages = 4;
     // Flush page size when the disk in warming state
+    // 当硬盘进行热交换时，刷新内存页大小 4K
     private int flushLeastPagesWhenWarmMapedFile = 1024 / 4 * 16;
     // How many pages are to be flushed when flush ConsumeQueue
     private int flushConsumeQueueLeastPages = 2;
@@ -124,12 +128,14 @@ public class MessageStoreConfig {
     @ImportantField
     private BrokerRole brokerRole = BrokerRole.ASYNC_MASTER;
     @ImportantField
+    // 异步刷盘
     private FlushDiskType flushDiskType = FlushDiskType.ASYNC_FLUSH;
     private int syncFlushTimeout = 1000 * 5;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
     private long flushDelayOffsetInterval = 1000 * 10;
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
+    // mappedFile 热交换
     private boolean warmMapedFileEnable = false;
     private boolean offsetCheckInSlave = false;
     private boolean debugLockEnable = false;
@@ -141,9 +147,11 @@ public class MessageStoreConfig {
 
     @ImportantField
     private boolean transientStorePoolEnable = false;
+    // transientStorePool 双端队列直接内存 ByteBuffer 个数
     private int transientStorePoolSize = 5;
+    // transientStorePool 没有 Buffer 是否支持快速失败
     private boolean fastFailIfNoBufferInStorePool = false;
-
+    // 是否启用 dledger，构建高可用、高持久化、强一致性的 commitlog 服务
     private boolean enableDLegerCommitLog = false;
     private String dLegerGroup;
     private String dLegerPeers;
@@ -189,6 +197,9 @@ public class MessageStoreConfig {
         this.warmMapedFileEnable = warmMapedFileEnable;
     }
 
+    /**
+     * @return mappedFile 文件大小，默认 1G
+     */
     public int getMappedFileSizeCommitLog() {
         return mappedFileSizeCommitLog;
     }
@@ -577,6 +588,7 @@ public class MessageStoreConfig {
         this.flushCommitLogTimed = flushCommitLogTimed;
     }
 
+    // ${RocketMQ_HOME}/store
     public String getStorePathRootDir() {
         return storePathRootDir;
     }
@@ -584,7 +596,7 @@ public class MessageStoreConfig {
     public void setStorePathRootDir(String storePathRootDir) {
         this.storePathRootDir = storePathRootDir;
     }
-
+    // 当硬盘进行热交换时，刷新内存页大小 4K
     public int getFlushLeastPagesWhenWarmMapedFile() {
         return flushLeastPagesWhenWarmMapedFile;
     }
@@ -610,6 +622,8 @@ public class MessageStoreConfig {
     }
 
     /**
+     * 是否启用 transientStorePool
+     * transientStorePoolEnable = true && 异步刷盘 && 主节点
      * Enable transient commitLog store pool only if transientStorePoolEnable is true and the FlushDiskType is
      * ASYNC_FLUSH
      *
@@ -648,6 +662,10 @@ public class MessageStoreConfig {
         this.fastFailIfNoBufferInStorePool = fastFailIfNoBufferInStorePool;
     }
 
+    /**
+     * commitlog putMessage 到 mappedFile 时是否使用可重入锁，默认使用自旋锁
+     * @return
+     */
     public boolean isUseReentrantLockWhenPutMessage() {
         return useReentrantLockWhenPutMessage;
     }

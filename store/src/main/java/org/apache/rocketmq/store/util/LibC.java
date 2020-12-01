@@ -21,6 +21,7 @@ import com.sun.jna.Native;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
+// https://docs.oracle.com/cd/E38902_01/html/E38880/chap6mem-36881.html
 
 public interface LibC extends Library {
     LibC INSTANCE = (LibC) Native.loadLibrary(Platform.isWindows() ? "msvcrt" : "c", LibC.class);
@@ -38,9 +39,11 @@ public interface LibC extends Library {
     int MS_INVALIDATE = 0x0002;
     /* synchronous memory sync */
     int MS_SYNC = 0x0004;
-
+    // 会导致将指定地址范围内的页面锁定在物理内存中。在此进程或其他进程中引用锁定页面不会导致缺页而需要执行 I/O 操作。
+    // 通过 JNA 调用 mlock 方法锁定 mappedByteBuffer 对应的物理内存，阻止操作系统将相关的内存页调度到交换空间（swap space），以此提升后续在访问 MappedFile 时的读写性能。
+    // 其可以将进程使用的部分或者全部的地址空间锁定在物理内存中，防止其被交换到swap空间。对于RocketMQ这种的高吞吐量的分布式消息队列来说，追求的是消息读写低延迟，那么肯定希望尽可能地多使用物理内存，提高数据读写访问的操作效率。
     int mlock(Pointer var1, NativeLong var2);
-
+    // 在物理内存够中解锁指定地址范围内的页面锁定
     int munlock(Pointer var1, NativeLong var2);
 
     int madvise(Pointer var1, NativeLong var2, int var3);
