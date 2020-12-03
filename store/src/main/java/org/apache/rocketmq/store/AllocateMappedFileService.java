@@ -88,7 +88,7 @@ public class AllocateMappedFileService extends ServiceThread {
                 this.requestTable.remove(nextFilePath);
                 return null;
             }
-            // 将指定的元素插入到此优先级队列中
+            // 数量充足的话，将指定的元素插入到此优先级队列中
             boolean offerOK = this.requestQueue.offer(nextReq);
             if (!offerOK) {
                 log.warn("never expected here, add a request to preallocate queue failed");
@@ -116,7 +116,7 @@ public class AllocateMappedFileService extends ServiceThread {
             log.warn(this.getServiceName() + " service has exception. so return null");
             return null;
         }
-        // 下一个分配请求
+        // 下一个分配请求，获取当前请求，然后通过线程协调器CountDownLatch，协调另一个线程进行完mmpOperation操作后，返回创建好的MappedFile文件
         AllocateRequest result = this.requestTable.get(nextFilePath);
         try {
             if (result != null) {
@@ -221,12 +221,20 @@ public class AllocateMappedFileService extends ServiceThread {
                 // TransientStorePool与MappedFile在数据处理上的差异在什么地方呢？
                 // 分析其代码，TransientStorePool会通过ByteBuffer.allocateDirect调用直接申请对外内存，消息数据在写入内存的时候是写入预申请的内存中。
                 // 在异步刷盘的时候，再由刷盘线程将这些内存中的修改写入文件。
-                // 那么与直接使用MappedByteBuffer相比差别在什么地方呢？修改MappedByteBuffer实际会将数据写入文件对应的Page Cache中，
-                // 而TransientStorePool方案下写入的则为纯粹的内存。因此在消息写入操作上会更快，因此能更少的占用CommitLog.putMessageLock锁，从而能够提升消息处理量。
+                // 那么与直接使用MappedByteBuffer相比差别在什么地方呢？
+                // MappedByteBuffer 和 WriteBuffer 都会经过，PageCache 这个操作进行写入磁盘。
+                // MappedByteBuffer写入数据，写入的是MappedByteBuffer映射的磁盘文件对应的Page Cache，可能会慢一点。
+                // 而TransientStorePool方案下写入的则为纯粹的内存，并不是PageCache，因此在消息写入操作上会更快，因此能更少的占用CommitLog.putMessageLock锁，从而能够提升消息处理量。然后再经过刷盘将直接内存中的数据经过Page Cache 写入磁盘。
                 // 使用TransientStorePool方案的缺陷主要在于在异常崩溃的情况下回丢失更多的消息。
-                // MappedByteBuffer 和 WriteBuffer 都会经过，PageCache 这个操作的。
-                // https://www.cnkirito.moe/file-io-best-practise/
+
+
+                // MMap的写入操作是：Mmap的MappedByteBuffer映射直接内存，直接内存映射文件，然后文件会对应Page Cache，也就是 MmapedByteBuffer的直接内存可能是Page Cache的东西，然后通过写Page Cache，然后再写入磁盘。
+                // FileChannle:是写直接内存，这个效率比较高，然后直接内存满了，在落盘的时候，再去经过Page Cache，落入磁盘。
+                // WriterBuffer的写入方式实际也就是FileChannel的写入方式，Mmap在写入4k一下的文件比较快，然后FileChannel写入文件大于4k时，比Mmap方式的要快，可能是因为PageCache 是4k，然后写着就可能去落盘了。
+                // 而FileChannel 是写满了直接内存，才去经过PageCache，这样写入直接内存的效率更高，然后再经过Page Cache，当大于4k的时候，大于Page Cache的内存的时候，就是FileChannel快了。大概因为FileChannel是基于Block（块）的。
                 // https://juejin.cn/post/6844903842472001550
+
+                // https://www.cnkirito.moe/file-io-best-practise/
                 // https://www.dazhuanlan.com/2019/11/05/5dc0f35b9a621/
                 // https://blog.csdn.net/alex_xfboy/article/details/90174840
 
@@ -255,24 +263,9 @@ public class AllocateMappedFileService extends ServiceThread {
 
                 // pre write mappedFile
                 // 通过 mmap 建立内存映射仅是将文件磁盘地址和虚拟地址通过映射对应起来，此时物理内存并没有填充磁盘文件内容。
-                // 当实际发生文件读写时，产生产生缺页中断并陷入内核，然后才会将磁盘文件内容读取至物理内存。针对上述场景，RocketMQ 设计了 MappedFile 预热机制。
+                // 当实际发生文件读写时，产生缺页中断并陷入内核，然后才会将磁盘文件内容读取至物理内存。针对上述场景，RocketMQ 设计了 MappedFile 预热机制。
                 // 当 RocketMQ 开启 MappedFile 内存预热（warmMapedFileEnable），且 MappedFile 文件映射空间大小大于等于 mapedFileSizeCommitLog（1 GB） 时，调用 warmMappedFile 方法对 MappedFile 进行预热。
 
-                // RocketMQ在创建并分配MappedFile的过程中预先写入了一些随机值到Mmap映射出的内存空间里。原因在于：
-                // 仅分配内存并进行mlock系统调用后并不会为程序完全锁定这些分配的内存，原因在于其中的分页可能是写时复制的。因此，就有必要对每个内存页面中写入一个假的值。
-                // 锁定的内存可能是写时复制的，这个时候，这个内存空间可能会改变。这个时候，写入假的临时值，这样就可以针对每一个内存分页的写入操做会强制 Linux 为当前进程分配一个独立、私有的内存页。
-
-                // 写时复制
-                // 写时复制：子进程依赖使用父进程开创的物理空间。
-                // 内核只为新生成的子进程创建虚拟空间结构，它们来复制于父进程的虚拟究竟结构，但是不为这些段分配物理内存，它们共享父进程的物理空间，当父子进程中有更改相应段的行为发生时，再为子进程相应的段分配物理空间。
-                // https://www.cnblogs.com/biyeymyhjob/archive/2012/07/20/2601655.html
-
-                // 当调用Mmap进行内存映射后，OS只是建立了虚拟内存地址至物理地址的映射表，而实际并没有加载任何文件至内存中。
-                // 程序要访问数据时，OS会检查该部分的分页是否已经在内存中，如果不在，则发出一次 缺页中断。X86的Linux中一个标准页面大小是4KB，
-                // 那么1G的CommitLog需要发生 1024KB/4KB=256次 缺页中断，才能使得对应的数据完全加载至物理内存中。
-                // 为了避免OS检查分页是否在内存中的过程出现大量缺页中断，RocketMQ在做Mmap内存映射的同时进行了madvise系统调用，
-                // 目的是使OS做一次内存映射后，使对应的文件数据尽可能多的预加载至内存中，降低缺页中断次数，从而达到内存预热的效果。
-                // RocketMQ通过map+madvise映射后预热机制，将磁盘中的数据尽可能多的加载到PageCache中，保证后续对ConsumeQueue和CommitLog的读取过程中，能够尽可能从内存中读取数据，提升读写性能。
                 if (mappedFile.getFileSize() >= this.messageStore.getMessageStoreConfig()
                     .getMappedFileSizeCommitLog()
                     &&

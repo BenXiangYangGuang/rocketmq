@@ -595,10 +595,31 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
-     * 对 mappedFile 文件进行预热，将数据从磁盘加载到内存，从物理磁盘数据加载到直接的内存映射空间 MappedByteBuffer
+     * 对 mappedFile 文件进行预热，将内存和磁盘映射起来，然后每页写入占位数据0，然后将这些0数据，刷新到磁盘，进行磁盘预热。
+     *
+     * 当调用Mmap进行内存映射后，OS只是建立了虚拟内存地址至物理地址的映射表，而实际并没有加载任何文件至内存中。
+     * 程序要访问数据时，OS会检查该部分的分页是否已经在内存中，如果不在，则发出一次 缺页中断。X86的Linux中一个标准页面大小是4KB，
+     * 那么1G的CommitLog需要发生 1024KB/4KB=256次 缺页中断，才能使得对应的数据完全加载至物理内存中。
+     *
+     *
+     * 为什么每个页都需要写入数据呢？
+     *
+     * RocketMQ在创建并分配MappedFile的过程中预先写入了一些随机值到Mmap映射出的内存空间里。原因在于：
+     * 仅分配内存并进行mlock系统调用后并不会为程序完全锁定这些分配的内存，原因在于其中的分页可能是写时复制的。因此，就有必要对每个内存页面中写入一个假的值。
+     * 锁定的内存可能是写时复制的，这个时候，这个内存空间可能会改变。这个时候，写入假的临时值，这样就可以针对每一个内存分页的写入操做会强制 Linux 为当前进程分配一个独立、私有的内存页。
+     *
+     * 写时复制
+     * 写时复制：子进程依赖使用父进程开创的物理空间。
+     * 内核只为新生成的子进程创建虚拟空间结构，它们来复制于父进程的虚拟究竟结构，但是不为这些段分配物理内存，它们共享父进程的物理空间，当父子进程中有更改相应段的行为发生时，再为子进程相应的段分配物理空间。
+     * https:www.cnblogs.com/biyeymyhjob/archive/2012/07/20/2601655.html
+     *
+     * 为了避免OS检查分页是否在内存中的过程出现大量缺页中断，RocketMQ在做Mmap内存映射的同时进行了madvise系统调用，
+     * 目的是使OS做一次内存映射后，使对应的文件数据尽可能多的预加载至内存中，降低缺页中断次数，从而达到内存预热的效果。
+     * RocketMQ通过map+madvise映射后预热机制，将磁盘中的数据尽可能多的加载到PageCache中，保证后续对ConsumeQueue和CommitLog的读取过程中，能够尽可能从内存中读取数据，提升读写性能。
+     *
      * mappedFile 文件进行
      * @param type 刷盘类型
-     * @param pages 4k，系统缓存页，刷盘大小
+     * @param pages 4k，系统缓存页，刷盘大小： 1024 / 4 * 16
      */
     public void warmMappedFile(FlushDiskType type, int pages) {
         long beginTime = System.currentTimeMillis();
@@ -612,7 +633,7 @@ public class MappedFile extends ReferenceResource {
             // 刷盘方式是同步策略时，进行刷盘操作
             // 每修改 pages 个分页刷一次盘，相当于 4096 * 4k = 16M，每 16 M刷一次盘，1G 文件 1024M/16M = 64 次
             // force flush when flush disk type is sync
-            // 如果刷盘策略为同步刷盘，需要对每页进行刷盘。
+            // 如果刷盘策略为同步刷盘，需要对每个页进行刷盘
             if (type == FlushDiskType.SYNC_FLUSH) {
                 if ((i / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE) >= pages) {
                     flush = i;
@@ -634,6 +655,7 @@ public class MappedFile extends ReferenceResource {
         }
 
         // force flush when prepare load finished
+        // 前面对每个页，写入了数据（0 占位用，防止被内存交互），进行了刷盘，然后这个操作是对所有的内存进行刷盘。
         if (type == FlushDiskType.SYNC_FLUSH) {
             log.info("mapped file warm-up done, force to disk, mappedFile={}, costTime={}",
                 this.getFileName(), System.currentTimeMillis() - beginTime);
@@ -678,11 +700,7 @@ public class MappedFile extends ReferenceResource {
             int ret = LibC.INSTANCE.mlock(pointer, new NativeLong(this.fileSize));
             log.info("mlock {} {} {} ret = {} time consuming = {}", address, this.fileName, this.fileSize, ret, System.currentTimeMillis() - beginTime);
         }
-        // 文件预热：预热的目的主要有两点；第一点，由于仅分配内存并进行mlock系统调用后并不会为程序完全锁定这些内存，因为其中的分页可能是写时复制的。
-        // 因此，就有必要对每个内存页面中写入一个假的值。其中，RocketMQ是在创建并分配MappedFile的过程中，预先写入一些随机值至Mmap映射出的内存空间里。
-        // 第二，调用Mmap进行内存映射后，OS只是建立虚拟内存地址至物理地址的映射表，而实际并没有加载任何文件至内存中。
-        // 程序要访问数据时OS会检查该部分的分页是否已经在内存中，如果不在，则发出一次缺页中断。这里，可以想象下1G的CommitLog需要发生多少次缺页中断，
-        // 才能使得对应的数据才能完全加载至物理内存中（ps：X86的Linux中一个标准页面大小是4KB）？
+
         // RocketMQ的做法是，在做Mmap内存映射的同时进行madvise系统调用，目的是使OS做一次内存映射后对应的文件数据尽可能多的预加载至内存中，从而达到内存预热的效果。
         {
             int ret = LibC.INSTANCE.madvise(pointer, new NativeLong(this.fileSize), LibC.MADV_WILLNEED);

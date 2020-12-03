@@ -94,7 +94,7 @@ public class DefaultMessageStore implements MessageStore {
     private final ScheduleMessageService scheduleMessageService;
 
     private final StoreStatsService storeStatsService;
-    // 消息对内缓存
+    // 消息临时存储
     private final TransientStorePool transientStorePool;
 
     private final RunningFlags runningFlags = new RunningFlags();
@@ -155,7 +155,7 @@ public class DefaultMessageStore implements MessageStore {
 
         this.transientStorePool = new TransientStorePool(messageStoreConfig);
         // 根据是否开启 transientStorePoolEnable，存在两种初始化情况。
-        // transientStorePoolEnable 为 true 表示内容先存储在对外内存，然后通过 Commit 线程将数据提交到内存映射Buffer中，再通过 Flush 线程将内存映射 Buffer 中的数据持久化到磁盘中。
+        // transientStorePoolEnable 为 true 表示内容先存储在堆外内存(直接内存)，然后通过 Commit 线程将数据提交到FileChannel中，再通过 Flush 线程将内存映射 Buffer 中的数据持久化到磁盘中。
         if (messageStoreConfig.isTransientStorePoolEnable()) {
             this.transientStorePool.init();
         }
