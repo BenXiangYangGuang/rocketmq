@@ -33,6 +33,9 @@ import org.apache.rocketmq.store.DefaultMessageStore;
 import org.apache.rocketmq.store.DispatchRequest;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
+/**
+ * 构建commitlog的消息索引Index文件服务
+ */
 public class IndexService {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     /**
@@ -40,7 +43,9 @@ public class IndexService {
      */
     private static final int MAX_TRY_IDX_CREATE = 3;
     private final DefaultMessageStore defaultMessageStore;
+    // 哈希槽的数量 500万
     private final int hashSlotNum;
+    // 哈希索引的数量 2千万
     private final int indexNum;
     private final String storePath;
     private final ArrayList<IndexFile> indexFileList = new ArrayList<IndexFile>();
@@ -54,6 +59,11 @@ public class IndexService {
             StorePathConfigHelper.getStorePathIndex(store.getMessageStoreConfig().getStorePathRootDir());
     }
 
+    /**
+     * 加载已经存在的Index文件
+     * @param lastExitOK
+     * @return
+     */
     public boolean load(final boolean lastExitOK) {
         File dir = new File(this.storePath);
         File[] files = dir.listFiles();
@@ -154,6 +164,15 @@ public class IndexService {
         }
     }
 
+    /**
+     * 根据Index消息查询服务
+     * @param topic
+     * @param key
+     * @param maxNum
+     * @param begin 消息存储的开始时间，和IndexFile 的IndexHeader中的存储消息的开始时间进行对比
+     * @param end 消息存储的结束时间，和IndexFile 的IndexHeader中的存储消息的结束时间进行对比
+     * @return
+     */
     public QueryOffsetResult queryOffset(String topic, String key, int maxNum, long begin, long end) {
         List<Long> phyOffsets = new ArrayList<Long>(maxNum);
 
@@ -193,14 +212,20 @@ public class IndexService {
 
         return new QueryOffsetResult(phyOffsets, indexLastUpdateTimestamp, indexLastUpdatePhyoffset);
     }
-
+    // 构建key
     private String buildKey(final String topic, final String key) {
         return topic + "#" + key;
     }
 
+    /**
+     * 根据一条消息的请求构建Index索引
+     * @param req
+     */
     public void buildIndex(DispatchRequest req) {
+        //获取需要写入的IndexFile
         IndexFile indexFile = retryGetAndCreateIndexFile();
         if (indexFile != null) {
+            // 文件结尾offset
             long endPhyOffset = indexFile.getEndPhyOffset();
             DispatchRequest msg = req;
             String topic = msg.getTopic();
@@ -208,7 +233,7 @@ public class IndexService {
             if (msg.getCommitLogOffset() < endPhyOffset) {
                 return;
             }
-
+            // 事务消息
             final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
             switch (tranType) {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
@@ -218,7 +243,7 @@ public class IndexService {
                 case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE:
                     return;
             }
-
+            // 根据uniqKey来构建文件
             if (req.getUniqKey() != null) {
                 indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));
                 if (indexFile == null) {
@@ -226,7 +251,7 @@ public class IndexService {
                     return;
                 }
             }
-
+            // 根据keys中的每个key来构建indexFile
             if (keys != null && keys.length() > 0) {
                 String[] keyset = keys.split(MessageConst.KEY_SEPARATOR);
                 for (int i = 0; i < keyset.length; i++) {
@@ -245,15 +270,23 @@ public class IndexService {
         }
     }
 
+    /**
+     * 放置key到indexFile中
+     * @param indexFile
+     * @param msg 消息请求
+     * @param idxKey topic#uniqKey
+     * @return
+     */
     private IndexFile putKey(IndexFile indexFile, DispatchRequest msg, String idxKey) {
+        // for循环一直方法详细，直到出现一个错误
         for (boolean ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp()); !ok; ) {
             log.warn("Index file [" + indexFile.getFileName() + "] is full, trying to create another one");
-
+            //再次获取或创建IndexFile
             indexFile = retryGetAndCreateIndexFile();
             if (null == indexFile) {
                 return null;
             }
-
+            //存放消息
             ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp());
         }
 

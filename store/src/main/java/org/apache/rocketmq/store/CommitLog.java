@@ -72,6 +72,7 @@ public class CommitLog {
 
     // topic-queue-id，offset；消息的key，和在 commitlog 中的 offset，方便消息存储时的索引
     protected HashMap<String/* topic-queueid */, Long/* offset */> topicQueueTable = new HashMap<String, Long>(1024);
+    // 异步构建ConsumeQueue、Index文件构建过的offset的值
     protected volatile long confirmOffset = -1L;
 
     private volatile long beginTimeInLock = 0;
@@ -171,7 +172,7 @@ public class CommitLog {
     }
 
     /**
-     * 使用副本读取数据
+     * 获取需要构建ConsumeQueue、Index文件的数据，使用副本读取数据
      * Read CommitLog data, use data replication
      */
     public SelectMappedBufferResult getData(final long offset) {
@@ -1220,11 +1221,21 @@ public class CommitLog {
         return -1;
     }
 
+    /**
+     * 根据offset查询消息
+     * @param offset 是一个消息字节的大小位置，并不是消息个数的offset；第一条消息8个字节，第二条消息的offset为9;
+     * @param size 为查询的字节大小，为这个offset之后，查询多少个字节的数据
+     * @return
+     */
     public SelectMappedBufferResult getMessage(final long offset, final int size) {
+        // 1024 * 1024 * 1024 = 1G
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog();
+        // 获取这个offset所在的mappedFile 文件
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, offset == 0);
         if (mappedFile != null) {
+            // 获取offset在mappedFile的文件位置
             int pos = (int) (offset % mappedFileSize);
+            // 根据位置，和获取大小，获取消息
             return mappedFile.selectMappedBuffer(pos, size);
         }
         return null;

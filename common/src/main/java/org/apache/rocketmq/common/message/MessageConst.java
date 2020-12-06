@@ -57,7 +57,7 @@ public class MessageConst {
     // 集群名称属性
     public static final String PROPERTY_CLUSTER = "CLUSTER";
     public static final String PROPERTY_MESSAGE_TYPE = "MSG_TYPE";
-
+    // message的key的分隔符
     public static final String KEY_SEPARATOR = " ";
 
     public static final HashSet<String> STRING_HASH_SET = new HashSet<String>();

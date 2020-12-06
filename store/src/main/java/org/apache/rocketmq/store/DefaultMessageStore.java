@@ -82,7 +82,7 @@ public class DefaultMessageStore implements MessageStore {
     private final CleanCommitLogService cleanCommitLogService;
     // 清除 ConsumeQueue 文件服务
     private final CleanConsumeQueueService cleanConsumeQueueService;
-    // 索引文件实现类
+    // 构建Index索引文件实现类
     private final IndexService indexService;
     // MappedFile 分配服务
     private final AllocateMappedFileService allocateMappedFileService;
@@ -113,7 +113,7 @@ public class DefaultMessageStore implements MessageStore {
     private StoreCheckpoint storeCheckpoint;
 
     private AtomicLong printTimes = new AtomicLong(0);
-    // CommitLog 文件转发请求
+    // CommitLog 文件转发请求，包括构建ConsumeQueue和Index索引文件请求两种
     private final LinkedList<CommitLogDispatcher> dispatcherList;
     // 一个可以读写的 lock 文件
     private RandomAccessFile lockFile;
@@ -272,7 +272,9 @@ public class DefaultMessageStore implements MessageStore {
             }
             log.info("[SetReputOffset] maxPhysicalPosInLogicQueue={} clMinOffset={} clMaxOffset={} clConfirmedOffset={}",
                 maxPhysicalPosInLogicQueue, this.commitLog.getMinOffset(), this.commitLog.getMaxOffset(), this.commitLog.getConfirmOffset());
+            //异步构建ConsumeQueue、Index开始的offset
             this.reputMessageService.setReputFromOffset(maxPhysicalPosInLogicQueue);
+            // 开启异步构建服务
             this.reputMessageService.start();
 
             /**
@@ -293,8 +295,9 @@ public class DefaultMessageStore implements MessageStore {
             this.haService.start();
             this.handleScheduleMessageService(messageStoreConfig.getBrokerRole());
         }
-
+        //consumeQueue 刷盘服务
         this.flushConsumeQueueService.start();
+        // commitLog服务开启
         this.commitLog.start();
         this.storeStatsService.start();
 
@@ -784,6 +787,7 @@ public class DefaultMessageStore implements MessageStore {
         return 0;
     }
 
+    //
     public long getOffsetInQueueByTime(String topic, int queueId, long timestamp) {
         ConsumeQueue logic = this.findConsumeQueue(topic, queueId);
         if (logic != null) {
@@ -960,7 +964,7 @@ public class DefaultMessageStore implements MessageStore {
     public void executeDeleteFilesManually() {
         this.cleanCommitLogService.excuteDeleteFilesManualy();
     }
-
+    // 根据 key 查询消息
     @Override
     public QueryMessageResult queryMessage(String topic, String key, int maxNum, long begin, long end) {
         QueryMessageResult queryMessageResult = new QueryMessageResult();
@@ -1227,6 +1231,7 @@ public class DefaultMessageStore implements MessageStore {
         return null;
     }
 
+    // 根据topic和queueId获取ConsumeQueue
     public ConsumeQueue findConsumeQueue(String topic, int queueId) {
         ConcurrentMap<Integer, ConsumeQueue> map = consumeQueueTable.get(topic);
         if (null == map) {
@@ -1241,6 +1246,7 @@ public class DefaultMessageStore implements MessageStore {
 
         ConsumeQueue logic = map.get(queueId);
         if (null == logic) {
+            // 新建ConsumeQueue
             ConsumeQueue newLogic = new ConsumeQueue(
                 topic,
                 queueId,
@@ -1521,15 +1527,17 @@ public class DefaultMessageStore implements MessageStore {
     public RunningFlags getRunningFlags() {
         return runningFlags;
     }
-
+    // 处理分发请求
     public void doDispatch(DispatchRequest req) {
+        // dispatcherList为ConsumeQueue和Index两种构建索引请求
         for (CommitLogDispatcher dispatcher : this.dispatcherList) {
             dispatcher.dispatch(req);
         }
     }
-
+    // 处理从commit log 异步构建ConsumeQueue请求
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
+        // ConsumeQueue 处理从commit log 异步构建ConsumeQueue请求
         cq.putMessagePositionInfoWrapper(dispatchRequest);
     }
 
@@ -1586,14 +1594,19 @@ public class DefaultMessageStore implements MessageStore {
         }, 6, TimeUnit.SECONDS);
     }
 
+    /**
+     * 构建ConsumeQueue文件分发服务
+     */
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 
         @Override
         public void dispatch(DispatchRequest request) {
             final int tranType = MessageSysFlag.getTransactionValue(request.getSysFlag());
             switch (tranType) {
+                // 没有事务、事务提交
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
+                    //处理从commit log 异步构建ConsumeQueue请求
                     DefaultMessageStore.this.putMessagePositionInfo(request);
                     break;
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
@@ -1602,12 +1615,13 @@ public class DefaultMessageStore implements MessageStore {
             }
         }
     }
-
+    // 构建Index文件分发服务
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
         @Override
         public void dispatch(DispatchRequest request) {
             if (DefaultMessageStore.this.messageStoreConfig.isMessageIndexEnable()) {
+                //构建消息索引Index文件
                 DefaultMessageStore.this.indexService.buildIndex(request);
             }
         }
@@ -1906,8 +1920,11 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * commitlog文件异步分发构建ConsumeQueue和Index索引服务
+     */
     class ReputMessageService extends ServiceThread {
-
+        //异步构建开始offset
         private volatile long reputFromOffset = 0;
 
         public long getReputFromOffset() {
@@ -1935,37 +1952,52 @@ public class DefaultMessageStore implements MessageStore {
             super.shutdown();
         }
 
+        /**
+         * @return commitLog剩余未被构建的offset长度
+         */
         public long behind() {
             return DefaultMessageStore.this.commitLog.getMaxOffset() - this.reputFromOffset;
         }
 
+        /**
+         * @return commitlog是否还有需要构建的offset
+         */
         private boolean isCommitLogAvailable() {
             return this.reputFromOffset < DefaultMessageStore.this.commitLog.getMaxOffset();
         }
 
+        /**
+         * 异步构建ConsumeQueue、Index文件
+         * doReput()方法在没有需要构建的offset时会停止，但调用它的地方会一直不停的调用doReput()方法，进行再次构建ConsumeQueue
+         */
         private void doReput() {
+            // reputFromOffset小于commitlog中mappedFile文件开始的offset，进行reputFromOffset值调整为mappedFile文件的开始offset
             if (this.reputFromOffset < DefaultMessageStore.this.commitLog.getMinOffset()) {
                 log.warn("The reputFromOffset={} is smaller than minPyOffset={}, this usually indicate that the dispatch behind too much and the commitlog has expired.",
                     this.reputFromOffset, DefaultMessageStore.this.commitLog.getMinOffset());
                 this.reputFromOffset = DefaultMessageStore.this.commitLog.getMinOffset();
             }
+            //无限循环构建，commitlog文件剩余offset需要构建
             for (boolean doNext = true; this.isCommitLogAvailable() && doNext; ) {
-
+                // 开始构建的值
                 if (DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable()
                     && this.reputFromOffset >= DefaultMessageStore.this.getConfirmOffset()) {
                     break;
                 }
-
+                //根据需要构建的offset从MappedFile
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
+                        // 开始构建的offset
                         this.reputFromOffset = result.getStartOffset();
-
+                        // 一次读取ByteBuffer中一条消息，根据每条消息的大小获取一条消息，然后取下一条消息，构建一个DispatchRequest
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            // 创造异步构建ConsumeQueue的分发请求
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
-                            int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
+                            int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
+                            // 构建dispatchRequest成功
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
@@ -1988,11 +2020,13 @@ public class DefaultMessageStore implements MessageStore {
                                             .addAndGet(dispatchRequest.getMsgSize());
                                     }
                                 } else if (size == 0) {
+                                    // 重新获取构建的offset偏移量
                                     this.reputFromOffset = DefaultMessageStore.this.commitLog.rollNextFile(this.reputFromOffset);
                                     readSize = result.getSize();
                                 }
+                            // 构建失败
                             } else if (!dispatchRequest.isSuccess()) {
-
+                                // 构建失败，这条数据略过，进行构建位置更新，进行下一条ConsumeQueue条目的构建
                                 if (size > 0) {
                                     log.error("[BUG]read total count not equals msg total size. reputFromOffset={}", reputFromOffset);
                                     this.reputFromOffset += size;
@@ -2010,8 +2044,10 @@ public class DefaultMessageStore implements MessageStore {
                             }
                         }
                     } finally {
+                        // 获得需要构建的数据的释放
                         result.release();
                     }
+                // result为null不需要构建
                 } else {
                     doNext = false;
                 }
@@ -2021,10 +2057,11 @@ public class DefaultMessageStore implements MessageStore {
         @Override
         public void run() {
             DefaultMessageStore.log.info(this.getServiceName() + " service started");
-
+            // 异步构建ConsumeQueue、Index服务线程是否停止，一直调用doReput()方法，推送一次构建服务，线程休息1毫秒
             while (!this.isStopped()) {
                 try {
                     Thread.sleep(1);
+                    // 进行消息ConsumeQueue、Index文件异步构建
                     this.doReput();
                 } catch (Exception e) {
                     DefaultMessageStore.log.warn(this.getServiceName() + " service has exception. ", e);

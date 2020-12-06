@@ -283,7 +283,7 @@ public class MappedFile extends ReferenceResource {
     public long getFileFromOffset() {
         return this.fileFromOffset;
     }
-
+    // ConsumeQueue的索引条目存储到自己的MappedFile问价
     public boolean appendMessage(final byte[] data) {
         int currentPos = this.wrotePosition.get();
 
@@ -294,6 +294,7 @@ public class MappedFile extends ReferenceResource {
             } catch (Throwable e) {
                 log.error("Error occurred when append message to mappedFile.", e);
             }
+            //更新写入的位置
             this.wrotePosition.addAndGet(data.length);
             return true;
         }
@@ -477,7 +478,7 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
-     * 获取 mappedBuffer 中的数据
+     * 根据pos在mappedBuffer中的位置，还有获取多少个字节，来获取 mappedBuffer 中的数据
      * @param pos
      * @param size
      * @return

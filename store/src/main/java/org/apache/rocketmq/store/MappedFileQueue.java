@@ -653,6 +653,11 @@ public class MappedFileQueue {
         return mappedFileFirst;
     }
 
+    /**
+     * consumequeue根据消息的物理offset查找mappedFile
+     * @param offset consumequeue的物理offset
+     * @return
+     */
     public MappedFile findMappedFileByOffset(final long offset) {
         return findMappedFileByOffset(offset, false);
     }

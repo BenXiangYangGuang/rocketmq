@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
+ * ConsumeQueue的扩展，存储一些不重要的东西，比如存储时间、bit map的过滤
  * Extend of consume queue, to store something not important,
  * such as message store time, filter bit map and etc.
  * <p/>

@@ -24,23 +24,28 @@ import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
-
+//consumequeue文件的包装对象和commitlog是对等的
 public class ConsumeQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
-
+    // 每条消息的长度 8 + 4 + 8 = 20 byte；
+    // 8 字节的commitlogoffset + 4字节消息长度 + 8 字节tag hashCode
     public static final int CQ_STORE_UNIT_SIZE = 20;
     private static final InternalLogger LOG_ERROR = InternalLoggerFactory.getLogger(LoggerName.STORE_ERROR_LOGGER_NAME);
 
     private final DefaultMessageStore defaultMessageStore;
-
+    // ConsumeQueue 目录下的文件管理队列 MappedFileQueue，和commitLog目录下的MappedFileQueue是对应的
     private final MappedFileQueue mappedFileQueue;
+
     private final String topic;
     private final int queueId;
+    //暂存consumeQueue的20字节的条目的堆内存
     private final ByteBuffer byteBufferIndex;
 
     private final String storePath;
+    // consumeQueue文件大小：30万条 * 20byte = 5.7M
     private final int mappedFileSize;
     private long maxPhysicOffset = -1;
+    // consumequeue的最小偏移量
     private volatile long minLogicOffset = 0;
     private ConsumeQueueExt consumeQueueExt = null;
 
@@ -51,6 +56,7 @@ public class ConsumeQueue {
         final int mappedFileSize,
         final DefaultMessageStore defaultMessageStore) {
         this.storePath = storePath;
+        // consumeQueue文件大小：30万条 * 20byte = 5.7M
         this.mappedFileSize = mappedFileSize;
         this.defaultMessageStore = defaultMessageStore;
 
@@ -60,9 +66,9 @@ public class ConsumeQueue {
         String queueDir = this.storePath
             + File.separator + topic
             + File.separator + queueId;
-
+        // 构建ConsumeQueue的MappedFile，不采用预分配服务AllocateMappedFileService
         this.mappedFileQueue = new MappedFileQueue(queueDir, mappedFileSize, null);
-
+        // 创建一个20byte的堆内存
         this.byteBufferIndex = ByteBuffer.allocate(CQ_STORE_UNIT_SIZE);
 
         if (defaultMessageStore.getMessageStoreConfig().isEnableConsumeQueueExt()) {
@@ -376,6 +382,7 @@ public class ConsumeQueue {
         return this.minLogicOffset / CQ_STORE_UNIT_SIZE;
     }
 
+    // ConsumeQueue 处理从commit log 异步构建ConsumeQueue请求
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
         final int maxRetries = 30;
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
@@ -395,6 +402,7 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+            //将消息索引信息存放到consumequeue的byteBufferIndex中，并追加到consumequeue的内存映射文件中(本操作只追加并不刷盘)，ConsumeQueue的刷盘方式固定为异步刷盘模式
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {
@@ -421,7 +429,7 @@ public class ConsumeQueue {
         log.error("[BUG]consume queue can not write, {} {}", this.topic, this.queueId);
         this.defaultMessageStore.getRunningFlags().makeLogicsQueueError();
     }
-
+    // 将消息索引信息存放到consumequeue的byteBufferIndex中，并追加到consumequeue的内存映射文件中(本操作只追加并不刷盘)，ConsumeQueue的刷盘方式固定为异步刷盘模式
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
@@ -429,18 +437,22 @@ public class ConsumeQueue {
             log.warn("Maybe try to build consume queue repeatedly maxPhysicOffset={} phyOffset={}", maxPhysicOffset, offset);
             return true;
         }
-
+        // 将commitlog的偏移量、消息长度、tag hash code存入byteBufferIndex
         this.byteBufferIndex.flip();
+        //一条消息消费索引大小20byte
         this.byteBufferIndex.limit(CQ_STORE_UNIT_SIZE);
+        //commitlog的偏移量
         this.byteBufferIndex.putLong(offset);
+        //消息长度
         this.byteBufferIndex.putInt(size);
+        // tag hash code
         this.byteBufferIndex.putLong(tagsCode);
-
+        //开始存储consumequeue条目的物理偏移量
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
-
+        // 通过构造函数获取ConsumeQueue的MappedFile对象，不是预分配的
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
         if (mappedFile != null) {
-
+            // 如果是第一次创建，赋值一些变量
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
                 this.minLogicOffset = expectLogicOffset;
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);
@@ -449,7 +461,7 @@ public class ConsumeQueue {
                 log.info("fill pre blank space " + mappedFile.getFileName() + " " + expectLogicOffset + " "
                     + mappedFile.getWrotePosition());
             }
-
+            // 并根据consumeQueueOffset计算ConsumeQueue中物理地址，将内容追加到ConsumeQueue的内存映射文件中（本操作只追加并不刷盘），ConsumeQueue的刷盘方式固定为异步刷盘
             if (cqOffset != 0) {
                 long currentLogicOffset = mappedFile.getWrotePosition() + mappedFile.getFileFromOffset();
 
@@ -471,6 +483,7 @@ public class ConsumeQueue {
                 }
             }
             this.maxPhysicOffset = offset + size;
+            // 将内容追加到ConsumeQueue的内存映射文件中
             return mappedFile.appendMessage(this.byteBufferIndex.array());
         }
         return false;
@@ -488,12 +501,20 @@ public class ConsumeQueue {
         }
     }
 
+    /**
+     * 根据offset通过consumequeue查找消息
+     * @param startIndex 为查找的offset值
+     * @return
+     */
     public SelectMappedBufferResult getIndexBuffer(final long startIndex) {
         int mappedFileSize = this.mappedFileSize;
+        // consumequeue物理offset，消息条数*20字节（消息大小）
         long offset = startIndex * CQ_STORE_UNIT_SIZE;
         if (offset >= this.getMinLogicOffset()) {
+            // 确定mappedFile
             MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset);
             if (mappedFile != null) {
+                // 根据消息余数偏移量，进行ByteBuffer消息查找
                 SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize));
                 return result;
             }

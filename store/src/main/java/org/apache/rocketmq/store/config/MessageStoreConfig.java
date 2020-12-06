@@ -37,8 +37,10 @@ public class MessageStoreConfig {
     // ConsumeQueue file size,default is 30W
     private int mappedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
     // enable consume queue ext
+    // 是否启用ConsumeQueueExt对象
     private boolean enableConsumeQueueExt = false;
     // ConsumeQueue extend file size, 48M
+    // ConsumeQueueExt 扩展文件 48M
     private int mappedFileSizeConsumeQueueExt = 48 * 1024 * 1024;
     // Bit count of filter bit map.
     // this will be set by pipe of calculate filter bit map.
@@ -111,9 +113,12 @@ public class MessageStoreConfig {
     private int maxTransferCountOnMessageInDisk = 8;
     @ImportantField
     private int accessMessageInMemoryMaxRatio = 40;
+    // 是否开启消息索引Index服务
     @ImportantField
     private boolean messageIndexEnable = true;
+    // 哈希槽的数量500万个
     private int maxHashSlotNum = 5000000;
+    // 哈希索引的数量2千万个
     private int maxIndexNum = 5000000 * 4;
     private int maxMsgsNumBatch = 64;
     @ImportantField
@@ -139,6 +144,7 @@ public class MessageStoreConfig {
     private boolean warmMapedFileEnable = false;
     private boolean offsetCheckInSlave = false;
     private boolean debugLockEnable = false;
+    // 构建ConsumeQueue、Index文件commitlog是否允许重复转发
     private boolean duplicationEnable = false;
     private boolean diskFallRecorded = true;
     // 页缓存繁忙，超时时间
@@ -207,7 +213,7 @@ public class MessageStoreConfig {
     public void setMappedFileSizeCommitLog(int mappedFileSizeCommitLog) {
         this.mappedFileSizeCommitLog = mappedFileSizeCommitLog;
     }
-
+    // 返回consumeQueue文件大小：30万条 * 20byte = 5.7M
     public int getMappedFileSizeConsumeQueue() {
 
         int factor = (int) Math.ceil(this.mappedFileSizeConsumeQueue / (ConsumeQueue.CQ_STORE_UNIT_SIZE * 1.0));

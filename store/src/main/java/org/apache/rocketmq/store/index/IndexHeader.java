@@ -20,7 +20,11 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * IndexFile的索引头
+ */
 public class IndexHeader {
+    //IndexHeader字节大小
     public static final int INDEX_HEADER_SIZE = 40;
     private static int beginTimestampIndex = 0;
     private static int endTimestampIndex = 8;
@@ -28,13 +32,19 @@ public class IndexHeader {
     private static int endPhyoffsetIndex = 24;
     private static int hashSlotcountIndex = 32;
     private static int indexCountIndex = 36;
+    // 存放IndexHeader的buffer
     private final ByteBuffer byteBuffer;
+    // indexFile存放消息的存储时间的 开始时间
     private AtomicLong beginTimestamp = new AtomicLong(0);
+    // indexFile存放消息的存储时间的 结束时间
     private AtomicLong endTimestamp = new AtomicLong(0);
+    // indexFile 开始commitLog 文件的offset
     private AtomicLong beginPhyOffset = new AtomicLong(0);
+    // IndexFile 结束commitLog 文件的offset
     private AtomicLong endPhyOffset = new AtomicLong(0);
+    // hash槽的Count 500万
     private AtomicInteger hashSlotCount = new AtomicInteger(0);
-
+    // hash索引的条目2千万条
     private AtomicInteger indexCount = new AtomicInteger(1);
 
     public IndexHeader(final ByteBuffer byteBuffer) {

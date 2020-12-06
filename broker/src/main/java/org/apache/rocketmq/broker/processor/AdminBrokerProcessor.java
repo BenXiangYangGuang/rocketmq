@@ -1519,7 +1519,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
                     this.brokerController.getConsumerFilterManager());
             }
         }
-
+        // 根据consumequeue进行消息消费
         SelectMappedBufferResult result = consumeQueue.getIndexBuffer(requestHeader.getIndex());
         if (result == null) {
             response.setRemark(String.format("Index %d of %d@%s is not exist!", requestHeader.getIndex(), requestHeader.getQueueId(), requestHeader.getTopic()));
