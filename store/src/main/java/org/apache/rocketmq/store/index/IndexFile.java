@@ -97,7 +97,7 @@ public class IndexFile {
     public boolean isWriteFull() {
         return this.indexHeader.getIndexCount() >= this.indexNum;
     }
-
+    // indexFile 映射文件的销毁
     public boolean destroy(final long intervalForcibly) {
         return this.mappedFile.destroy(intervalForcibly);
     }

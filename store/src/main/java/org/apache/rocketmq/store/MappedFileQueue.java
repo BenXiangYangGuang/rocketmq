@@ -185,7 +185,7 @@ public class MappedFileQueue {
     }
 
     /**
-     * 项目启动，加载 commitlog 文件夹下对应的文件
+     * 项目启动，加载 commitlog 文件夹下对应的文件，只是创建了对应的MappedFile，并没有从磁盘加载文件
      * @return
      */
     public boolean load() {
@@ -196,7 +196,7 @@ public class MappedFileQueue {
             // 根据文件名（offset）排序
             Arrays.sort(files);
             for (File file : files) {
-                // 如果物理文件大小 ！= mappedFileSize，说明文件被破坏了，返回false
+                // 如果物理文件大小 ！= mappedFileSize，说明文件被破坏了，直接返回false
                 if (file.length() != this.mappedFileSize) {
                     log.warn(file + "\t" + file.length()
                         + " length not matched message store config value, please check it manually");

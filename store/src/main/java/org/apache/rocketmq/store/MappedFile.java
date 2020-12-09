@@ -546,9 +546,15 @@ public class MappedFile extends ReferenceResource {
         return true;
     }
 
+    /**
+     * 文件的销毁，资源的释放
+     *
+     * @param intervalForcibly 拒绝被销毁的最大存活时间
+     * @return
+     */
     public boolean destroy(final long intervalForcibly) {
         this.shutdown(intervalForcibly);
-
+        // mappedFile文件是否被清除
         if (this.isCleanupOver()) {
             try {
                 this.fileChannel.close();

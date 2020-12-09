@@ -272,7 +272,9 @@ public class BrokerController {
                 log.error("Failed to initialize", e);
             }
         }
-        // 预热加载 commitlog 文件夹下历史 mappedFile 文件
+        // 项目启动加载 commitlog、consumequeue、index、checkpoint、abort 文件及文件夹下历史文件
+        // abort:项目启动创建abort文件，正常退出删除abort文件，异常退出保留abort文件
+        // checkpoint：文件检测点，存储commitlog文件最后一次刷盘时间戳、consumequeue最后一次刷盘时间、index索引文件最后一次刷盘时间戳。
         result = result && this.messageStore.load();
 
         if (result) {

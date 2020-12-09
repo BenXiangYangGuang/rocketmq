@@ -44,6 +44,7 @@ public class ConsumeQueue {
     private final String storePath;
     // consumeQueue文件大小：30万条 * 20byte = 5.7M
     private final int mappedFileSize;
+    //consumequeue文件的最大的offset
     private long maxPhysicOffset = -1;
     // consumequeue的最小偏移量
     private volatile long minLogicOffset = 0;
@@ -90,30 +91,38 @@ public class ConsumeQueue {
         }
         return result;
     }
-
+    // 把不符合的 consueme 文件删除，一个 consume 条目正确的标准（commitlog偏移量 >0 size > 0）[从倒数第三个文件开始恢复]。
+    // 最终目的：加载磁盘中的数据到MappedFile，并更新mappedFileQueue中的commitWhere、flushWhere值，并删除错误的mappedFile文件
     public void recover() {
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
-
+            // 从倒数第三个文件开始恢复，这是一个经验吧，从倒数第三个consumequeue来恢复数据，不够3个从第0个开始
             int index = mappedFiles.size() - 3;
             if (index < 0)
                 index = 0;
-
+            // 逻辑文件大小
             int mappedFileSizeLogics = this.mappedFileSize;
+            // 获取mappedFile文件
             MappedFile mappedFile = mappedFiles.get(index);
             ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
+            // 为commitlog已经确认的偏移量，为commitlog需要恢复的偏移量
             long processOffset = mappedFile.getFileFromOffset();
+            // 为当前文件检验已经通过的offset
             long mappedFileOffset = 0;
             long maxExtAddr = 1;
+            // while循环，接连恢复3个文件，结束后跳出，while循环
             while (true) {
                 for (int i = 0; i < mappedFileSizeLogics; i += CQ_STORE_UNIT_SIZE) {
                     long offset = byteBuffer.getLong();
                     int size = byteBuffer.getInt();
+                    // tag的hashcode
                     long tagsCode = byteBuffer.getLong();
 
                     if (offset >= 0 && size > 0) {
                         mappedFileOffset = i + CQ_STORE_UNIT_SIZE;
+                        // 最大的恢复的byte位置
                         this.maxPhysicOffset = offset + size;
+                        // 处理ConsumeQueueExt扩展
                         if (isExtAddr(tagsCode)) {
                             maxExtAddr = tagsCode;
                         }
@@ -123,9 +132,11 @@ public class ConsumeQueue {
                         break;
                     }
                 }
-
+                // 这个文件没有问题，检测下一个文件，未下一个文件检测做准备，继续在while里面循环
                 if (mappedFileOffset == mappedFileSizeLogics) {
+                    // 一下文件的下标
                     index++;
+                    // 大于最大文件数
                     if (index >= mappedFiles.size()) {
 
                         log.info("recover last consume queue file over, last mapped file "
@@ -144,12 +155,13 @@ public class ConsumeQueue {
                     break;
                 }
             }
-
+            // 最后三个文件一共恢复了多少个offset，加上起始processOffset，为当前consumequeue的处理offset，多个queueId下的consumequeue，去更新对应的的mappedFileQueue的最后flush、commit位置，并删除错误的mappedFile数据
             processOffset += mappedFileOffset;
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
+            // 删除这个offset之后的错误的mappedFile数据
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
-
+            // 处理ConsumeQueueExt扩展
             if (isExtReadEnable()) {
                 this.consumeQueueExt.recover();
                 log.info("Truncate consume queue extend file by max {}", maxExtAddr);
@@ -433,6 +445,7 @@ public class ConsumeQueue {
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
+        // 这里对历史commitlog文件进行恢复时，如果maxPhysicOffset已经存在直接返回
         if (offset + size <= this.maxPhysicOffset) {
             log.warn("Maybe try to build consume queue repeatedly maxPhysicOffset={} phyOffset={}", maxPhysicOffset, offset);
             return true;

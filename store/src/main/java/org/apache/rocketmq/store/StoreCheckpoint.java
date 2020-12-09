@@ -27,13 +27,20 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * checkpoint文件包装对象
+ */
 public class StoreCheckpoint {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private final RandomAccessFile randomAccessFile;
     private final FileChannel fileChannel;
+    // 直接内存存放下面三个时间戳
     private final MappedByteBuffer mappedByteBuffer;
+    // commitlog文件刷盘时间点
     private volatile long physicMsgTimestamp = 0;
+    // 消息的消费队列文件刷盘时间点
     private volatile long logicsMsgTimestamp = 0;
+    // 索引文件刷盘时间点
     private volatile long indexMsgTimestamp = 0;
 
     public StoreCheckpoint(final String scpPath) throws IOException {

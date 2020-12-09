@@ -74,7 +74,7 @@ public class DefaultMessageStore implements MessageStore {
     // CommitLog
     // 文件存储实现类
     private final CommitLog commitLog;
-    // 消息队列存储缓存表，按消息主题分组
+    // 消息消费队列存储缓存表，按消息主题分组
     private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
     // 消息队列 ConsumeQueue 刷盘线程
     private final FlushConsumeQueueService flushConsumeQueueService;
@@ -174,7 +174,7 @@ public class DefaultMessageStore implements MessageStore {
         // 创建一个可以读写的 lock 文件
         lockFile = new RandomAccessFile(file, "rw");
     }
-
+    // 删除phyOffset之后的consumequeue的mappdFile
     public void truncateDirtyLogicFiles(long phyOffset) {
         ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
 
@@ -186,13 +186,15 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * 预热加载 commitlog 文件夹下历史 mappedFile 文件
+     * 项目启动加载 commitlog、consumequeue、index、checkpoint、abort 文件及文件夹下历史数据
      * @throws IOException
      */
     public boolean load() {
         boolean result = true;
 
         try {
+            // ${RocketMQ_HOME}/store/abort文件是否存在，存在：异常退出；不存在：正常退出。
+            // false：代表异常退出，true:代表正常退出
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
             // 处理延迟定时消息，加载
@@ -201,17 +203,22 @@ public class DefaultMessageStore implements MessageStore {
             }
 
             // load Commit Log
+            // 项目启动，加载 commitlog 文件夹下对应文件的mappedFile对象，只是创建了对应的MappedFile，做好了文件映射，并没有从磁盘加载文件
             result = result && this.commitLog.load();
 
             // load Consume Queue
+            // 加载 consumequeue 文件夹下对应文件的ConsumeQueue对象，只是创建了对应的ConsumeQueue对象，做好了文件映射，并没有从磁盘加载文件
             result = result && this.loadConsumeQueue();
-            // 监测点
+
             if (result) {
+                // 加载checkpoint文件，这个是真正加载文件了
                 this.storeCheckpoint =
                     new StoreCheckpoint(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
-
+                // 加载Index索引文件对应的IndexFile对象，做好了文件映射，实际是只加载了IndexHeader汇总信息，建立好了mmap磁盘映射
                 this.indexService.load(lastExitOK);
-
+                // 数据恢复
+                // 1. 先恢复 consumequeue 文件，把不符合的 consumequeue 文件删除，一个 consume 条目正确的标准（commitlog偏移量 >0 size > 0）[从倒数第三个文件开始恢复]。
+                // 2. 如果 abort文件存在，此时找到第一个正常的 commitlog 文件，然后对该文件重新进行转发，依次更新 consumequeue,index文件，然后在恢复次commitlog文件。
                 this.recover(lastExitOK);
 
                 log.info("load over, and the max phy offset = {}", this.getMaxPhyOffset());
@@ -1401,15 +1408,17 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private boolean loadConsumeQueue() {
+        // consumequeue文件夹路径
         File dirLogic = new File(StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()));
         File[] fileTopicList = dirLogic.listFiles();
         if (fileTopicList != null) {
-
+            // topicList
             for (File fileTopic : fileTopicList) {
                 String topic = fileTopic.getName();
-
+                // topic下的队列文件数组
                 File[] fileQueueIdList = fileTopic.listFiles();
                 if (fileQueueIdList != null) {
+                    // 每个消息消费队列下的consumequeue索引文件
                     for (File fileQueueId : fileQueueIdList) {
                         int queueId;
                         try {
@@ -1417,12 +1426,15 @@ public class DefaultMessageStore implements MessageStore {
                         } catch (NumberFormatException e) {
                             continue;
                         }
+                        // 构建ConsumeQueue对象
                         ConsumeQueue logic = new ConsumeQueue(
                             topic,
                             queueId,
                             StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()),
+                            // 返回consumeQueue文件大小：30万条 * 20byte = 5.7M
                             this.getMessageStoreConfig().getMappedFileSizeConsumeQueue(),
                             this);
+                        // 存入topic下的消息消费队列集合
                         this.putConsumeQueue(topic, queueId, logic);
                         if (!logic.load()) {
                             return false;
@@ -1437,15 +1449,30 @@ public class DefaultMessageStore implements MessageStore {
         return true;
     }
 
+    /**
+     * 1. 先恢复 consumequeue 文件，把不符合的 consuemequeue 文件删除，一个consumequeue条目正确的标准（commitlog偏移量 >0 size > 0）[从倒数第三个文件开始恢复]。
+     * 2. 如果 abort文件存在，此时找到第一个正常的 commitlog 文件，然后对该文件重新进行转发，依次更新 consumequeue,index文件，然后在恢复commitlog文件。
+     * 3. 设置consumeQueueTable数据表中的topic-queueId的consumequeue中最大的mappedFile对应的offset
+     *
+     * 存储启动时所谓的文件恢复主要完成 flushedPosition, committedWhere 指针的设置 、消息消费队列最大偏移 加载到内存，并删除 flushedPosition 之后所有的文件。
+     * 如果Broker异常启动， 在文件恢复过程中RocketMQ会将最后一个有效文件中的所有消息重新转发到消息消费队列与索引文件，确保不丢失消息，但同时会带来消息重复的问题，纵观RocketMQ的整体设计思想，RocketMQ保证消息不丢失但不保证消息不会重复消费，故消息消费业务方需要实现消息消费的幕等设计。
+     * 但RocketMQ也做了一些优化，比如构建Index索引文件的offset时，和会已确认的offset已经对比，如果存在就不在构建直接返回，参考buildIndex()方法；同样构建consumequeue的时候也会和已确认的offset已经对比，如果存在就不在构建直接返回，参考putMessagePositionInfo()方法。
+     *
+     * @param lastExitOK 是否正常退出
+     */
     private void recover(final boolean lastExitOK) {
+        // 恢复consume
+        // maxPhyOffsetOfConsumeQueue为consumequeue中恢复的最大的commitlog的offset
         long maxPhyOffsetOfConsumeQueue = this.recoverConsumeQueue();
-
+        // 正常退出
         if (lastExitOK) {
+            // 正常退出commitlog正常恢复
             this.commitLog.recoverNormally(maxPhyOffsetOfConsumeQueue);
         } else {
+            // 异常退出commitlog恢复
             this.commitLog.recoverAbnormally(maxPhyOffsetOfConsumeQueue);
         }
-
+        // 设置consumeQueueTable数据表中的topic-queueId的consumequeue中最大的mappedFile对应的offset
         this.recoverTopicQueueTable();
     }
 
@@ -1456,7 +1483,7 @@ public class DefaultMessageStore implements MessageStore {
     public TransientStorePool getTransientStorePool() {
         return transientStorePool;
     }
-
+    // 存入topic下的消息消费队列集合
     private void putConsumeQueue(final String topic, final int queueId, final ConsumeQueue consumeQueue) {
         ConcurrentMap<Integer/* queueId */, ConsumeQueue> map = this.consumeQueueTable.get(topic);
         if (null == map) {
@@ -1468,12 +1495,21 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 恢复 consumequeue 文件，把不符合的 consume 文件删除，一个 consume 条目正确的标准（commitlog偏移量 >0 size > 0）[从倒数第三个文件开始恢复]。
+     * @return
+     */
     private long recoverConsumeQueue() {
         long maxPhysicOffset = -1;
+        // queueId-> ConsumeQueue;
+        // 对应的consumequeue对象遍历恢复
         for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
             for (ConsumeQueue logic : maps.values()) {
+                //一个topic下的一个queueId，恢复一次consumequeue
                 logic.recover();
+                // consumequeue文件的最大的offset
                 if (logic.getMaxPhysicOffset() > maxPhysicOffset) {
+                    // 赋值maxPhysicOffset = 当前文件最大的maxPhysicOffset，供下次比较
                     maxPhysicOffset = logic.getMaxPhysicOffset();
                 }
             }
@@ -1481,7 +1517,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return maxPhysicOffset;
     }
-
+    // 设置consumeQueueTable数据表中的topic-queueId的consumequeue中最大的mappedFile对应的offset
     public void recoverTopicQueueTable() {
         HashMap<String/* topic-queueid */, Long/* offset */> table = new HashMap<String, Long>(1024);
         long minPhyOffset = this.commitLog.getMinOffset();

@@ -50,8 +50,9 @@ public class IndexHeader {
     public IndexHeader(final ByteBuffer byteBuffer) {
         this.byteBuffer = byteBuffer;
     }
-
+    // 设置IndexHeader中的值
     public void load() {
+
         this.beginTimestamp.set(byteBuffer.getLong(beginTimestampIndex));
         this.endTimestamp.set(byteBuffer.getLong(endTimestampIndex));
         this.beginPhyOffset.set(byteBuffer.getLong(beginPhyoffsetIndex));
@@ -97,7 +98,9 @@ public class IndexHeader {
     }
 
     public void setBeginPhyOffset(long beginPhyOffset) {
+        // 设置值
         this.beginPhyOffset.set(beginPhyOffset);
+        // 存储到byteBuffer中
         this.byteBuffer.putLong(beginPhyoffsetIndex, beginPhyOffset);
     }
 
@@ -106,7 +109,9 @@ public class IndexHeader {
     }
 
     public void setEndPhyOffset(long endPhyOffset) {
+        // 设置值
         this.endPhyOffset.set(endPhyOffset);
+        // 存储到byteBuffer中
         this.byteBuffer.putLong(endPhyoffsetIndex, endPhyOffset);
     }
 
@@ -115,7 +120,9 @@ public class IndexHeader {
     }
 
     public void incHashSlotCount() {
+        // 自增值
         int value = this.hashSlotCount.incrementAndGet();
+        // 数值存入
         this.byteBuffer.putInt(hashSlotcountIndex, value);
     }
 
@@ -124,7 +131,9 @@ public class IndexHeader {
     }
 
     public void incIndexCount() {
+        // 自增值
         int value = this.indexCount.incrementAndGet();
+        // 数值存入
         this.byteBuffer.putInt(indexCountIndex, value);
     }
 }

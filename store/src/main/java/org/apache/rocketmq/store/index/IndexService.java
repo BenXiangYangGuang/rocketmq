@@ -61,7 +61,7 @@ public class IndexService {
 
     /**
      * 加载已经存在的Index文件
-     * @param lastExitOK
+     * @param lastExitOK 是否正常退出
      * @return
      */
     public boolean load(final boolean lastExitOK) {
@@ -73,8 +73,9 @@ public class IndexService {
             for (File file : files) {
                 try {
                     IndexFile f = new IndexFile(file.getPath(), this.hashSlotNum, this.indexNum, 0, 0);
+                    // 加载IndexFile，实际是只加载了IndexHeader汇总信息，建立好了mmap磁盘映射
                     f.load();
-
+                    // 非正常退出，如果indexFile中的indexHeader中的最后刷盘时间>checkpoint中的index索引刷盘时间，则表示是这个indexFile错误，立马销毁
                     if (!lastExitOK) {
                         if (f.getEndTimestamp() > this.defaultMessageStore.getStoreCheckpoint()
                             .getIndexMsgTimestamp()) {
@@ -84,6 +85,7 @@ public class IndexService {
                     }
 
                     log.info("load index file OK, " + f.getFileName());
+                    // 加载文件到索引存在列表
                     this.indexFileList.add(f);
                 } catch (IOException e) {
                     log.error("load file {} error", file, e);
@@ -230,6 +232,7 @@ public class IndexService {
             DispatchRequest msg = req;
             String topic = msg.getTopic();
             String keys = msg.getKeys();
+            // 这里对历史commitlog文件进行恢复时，如果endPhyOffset已经存在直接返回
             if (msg.getCommitLogOffset() < endPhyOffset) {
                 return;
             }
