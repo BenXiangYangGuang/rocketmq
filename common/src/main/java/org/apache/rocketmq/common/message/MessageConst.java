@@ -22,6 +22,7 @@ public class MessageConst {
     public static final String PROPERTY_KEYS = "KEYS";
     public static final String PROPERTY_TAGS = "TAGS";
     // 等待消息存储
+    // 是否等待服务器将这一条消息存储完毕再返回（等待刷盘完成），还是直接处理其他写队列里面的请求
     public static final String PROPERTY_WAIT_STORE_MSG_OK = "WAIT";
     // 消息延迟级别
     public static final String PROPERTY_DELAY_TIME_LEVEL = "DELAY";

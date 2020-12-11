@@ -69,7 +69,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     }
 
     /**
-     * 接收 producer 发送消息的请求，进行处理
+     * 接收 producer 发送消息的请求，同步的方式处理
      * @param ctx
      * @param request
      * @return
@@ -89,7 +89,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     }
 
     /**
-     * 拒绝发送消息的请求
+     * 发送消息的请求的异步方式处理，Producer发送方式可以为同步、异步、wayone等多种形式
      * @param ctx
      * @param request
      * @param responseCallback
@@ -101,7 +101,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     }
 
     /**
-     * 异步处理 producer 发送消息的请求
+     * 方法重载，同步异步都会调用此方法，处理 producer 发送消息的请求
      * @param ctx
      * @param request
      * @return

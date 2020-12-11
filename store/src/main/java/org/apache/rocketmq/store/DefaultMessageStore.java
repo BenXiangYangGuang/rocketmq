@@ -439,7 +439,7 @@ public class DefaultMessageStore implements MessageStore {
         }
         return PutMessageStatus.PUT_OK;
     }
-
+    // 异步的方式存储消息
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
@@ -453,8 +453,9 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         long beginTime = this.getSystemClock().now();
+        // 异步的方式存放消息
         CompletableFuture<PutMessageResult> putResultFuture = this.commitLog.asyncPutMessage(msg);
-
+        //根据结果做存放消息统计
         putResultFuture.thenAccept((result) -> {
             long elapsedTime = this.getSystemClock().now() - beginTime;
             if (elapsedTime > 500) {

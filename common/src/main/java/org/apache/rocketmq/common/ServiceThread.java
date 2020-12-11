@@ -31,7 +31,7 @@ public abstract class ServiceThread implements Runnable {
     private static final long JOIN_TIME = 90 * 1000;
     // 封装的线程
     private Thread thread;
-    // 等待基数点
+    // 同步等待基数点
     protected final CountDownLatch2 waitPoint = new CountDownLatch2(1);
     // 是否通知线程标志
     protected volatile AtomicBoolean hasNotified = new AtomicBoolean(false);
@@ -138,32 +138,44 @@ public abstract class ServiceThread implements Runnable {
         this.stopped = true;
         log.info("makestop thread " + this.getServiceName());
     }
-
+    // 唤醒处理刷盘请求写磁盘线程，处理刷盘请求线程和提交刷盘请求之前的协调，通过控制hasNotified状态来实现写队列和读队列的交换
     public void wakeup() {
+        // hasNotified默认值是false，未被唤醒，这个操作之后唤醒了，处理刷盘请求
         if (hasNotified.compareAndSet(false, true)) {
+            // waitPoint默认是1，然后其他线程处理
             waitPoint.countDown(); // notify
         }
     }
 
+    /**
+     * 设置hasNotified为false，未被通知，然后交换写对队列和读队列，重置waitPoint为（1），休息200ms，finally设置hasNotified为未被通知，交换写对队列和读队列
+     * @param interval 200ms
+     */
     protected void waitForRunning(long interval) {
+        // compareAndSet(except,update);如果真实值value==except，设置value值为update，返回true；如果真实值value !=except，真实值不变，返回false；
+        // 如果hasNotified真实值为true，那么设置真实值为false，返回true；hasNotified真实值为false，那就返回false，真实值不变
+        // 如果已经通知了，那就状态变为未通知，如果是同步刷盘任务，交换写请求队列和读请求队列
         if (hasNotified.compareAndSet(true, false)) {
+            // 同步刷盘：写队列和读队列交换
             this.onWaitEnd();
             return;
         }
-
+        // 重置countDownLatch对象，等待接受刷盘请求的线程写入请求到requestsRead，写完后，waitPoint.countDown,唤醒处理刷盘请求的线程，开始刷盘
         //entry to wait
         waitPoint.reset();
 
         try {
+            // 等待interval毫秒
             waitPoint.await(interval, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             log.error("Interrupted", e);
         } finally {
+            // 设置是否通知为false
             hasNotified.set(false);
             this.onWaitEnd();
         }
     }
-
+    // 等待这个方法的步骤完成。比如：同步刷盘：写队列和读队列交换
     protected void onWaitEnd() {
     }
 

@@ -76,10 +76,12 @@ public abstract class ReferenceResource {
      * 释放引用，引用次数为 0 时，清除这个 mappedByteBuffer，还要 mappedFile 文件个数 - 1，JVM 映射的直接内存  - fileSize
      */
     public void release() {
+        // 当前file引用个数-1
         long value = this.refCount.decrementAndGet();
+        // > 0，返回；否则清除file
         if (value > 0)
             return;
-
+        // 清除mappedFile的mappedByteBuffer，减少内存空间统计
         synchronized (this) {
 
             this.cleanupOver = this.cleanup(value);

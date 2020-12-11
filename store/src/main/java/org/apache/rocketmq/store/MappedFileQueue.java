@@ -406,7 +406,7 @@ public class MappedFileQueue {
     }
 
     /**
-     * 多少数据需要提交到映射内存 ByteBuffer 中
+     * 多少数据需要提交到FileChannel中
      * @return
      */
     public long remainHowManyDataToCommit() {
@@ -540,7 +540,9 @@ public class MappedFileQueue {
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
+            // mappedFile刷新的offset
             int offset = mappedFile.flush(flushLeastPages);
+            // 刷新的总位置
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.flushedWhere;
             this.flushedWhere = where;
@@ -562,16 +564,18 @@ public class MappedFileQueue {
         // 获取提交的 mappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
-            // 已经提交了的 offset
+            // 返回已经提交了mappedFile的截止位置
             int offset = mappedFile.commit(commitLeastPages);
             // 下次提交的 offset 值
             long where = mappedFile.getFileFromOffset() + offset;
-            // 提交了的值和下次要提交的值进行对比，看是否提交成功，提交成功，返回 true，否则返回失败
+            // committedWhere上次提交了的位置
+            // 检测是否提交成功，这次提交了的位置offset是否等于上次提交的位置，
+            // result=false，表示提交了数据，多与上次提交的位置；表示此次有数据提交
             result = where == this.committedWhere;
-            //  下次提交的 offset 值
+            //  下次提交的offset的开始值
             this.committedWhere = where;
         }
-
+        // 是否
         return result;
     }
 

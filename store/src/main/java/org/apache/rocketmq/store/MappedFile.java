@@ -364,13 +364,12 @@ public class MappedFile extends ReferenceResource {
      *
      * commitLeastPages 为本次提交最小的页数，如果待提交数据不满 commitLeastPages，则不执行提交操作，待下次提交。
      * writerBuffer 如果为空，直接返回 wrotePosition 指针，无须执行 commit 操作，表明 commit 操作主题是 writerBuffer
-     * @param commitLeastPages 为本次提交最小的页数，默认为 4 todo
-     * @return
+     * @param commitLeastPages 为本次提交最小的页数，默认为 4
+     * @return 返回已经提交了的截止位置
      */
     public int commit(final int commitLeastPages) {
         // writerBuffer 为 null，表示 transientStorePool 未开启，不存在从堆外内存 writerBuffer，向映射内存提交动作，表明提交内存的主题时 writerBuffer；
-        // writerBuffer 为 null，可能就不需要 commit 这个操作了，有待验证
-        // todo
+        // writerBuffer 为 null，可能就不需要 commit 这个操作了，只需要返回wrotePosition作为committedPosition
         if (writeBuffer == null) {
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
             return this.wrotePosition.get();
@@ -387,12 +386,12 @@ public class MappedFile extends ReferenceResource {
         }
 
         // All dirty data has been committed to FileChannel.
-        // 所有的脏数据已经提交到了 FileChannel
+        // 所有的脏数据已经提交到了 FileChannel，释放writerBuffer
         if (writeBuffer != null && this.transientStorePool != null && this.fileSize == this.committedPosition.get()) {
             this.transientStorePool.returnBuffer(writeBuffer);
             this.writeBuffer = null;
         }
-
+        // 返回已经提交了的截止位置
         return this.committedPosition.get();
     }
 
@@ -416,17 +415,21 @@ public class MappedFile extends ReferenceResource {
                 // writeBuffer 一定不为 null，因为这个方法调用的地方已经进行了判断，如果writerBuffer 为 null，直接返回了一个wrotePosition;
                 // writerBuffer 不为 null,一定使用了 transientStorePool，将 transientStorePoll 中开辟直接内存的 ByteBuffer 数据进行提交到，MappedByteBuffer 直接内存映射中。
                 ByteBuffer byteBuffer = writeBuffer.slice();
+                // 这次提交的开始位置
                 byteBuffer.position(lastCommittedPosition);
+                // 设置byteBuffer大小，这次取出需要提交的截止位置
                 byteBuffer.limit(writePos);
+                // 设置提交到fileChannel的开始位置
                 this.fileChannel.position(lastCommittedPosition);
                 this.fileChannel.write(byteBuffer);
+                // 设置writePos为已经提交了的位置
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {
                 log.error("Error occurred when commit data to FileChannel.", e);
             }
         }
     }
-
+    // 是否可以刷盘
     private boolean isAbleToFlush(final int flushLeastPages) {
         int flush = this.flushedPosition.get();
         int write = getReadPosition();
@@ -524,7 +527,7 @@ public class MappedFile extends ReferenceResource {
 
         return null;
     }
-
+    // 清除mappedFile的mappedByteBuffer，减少内存空间统计
     @Override
     public boolean cleanup(final long currentRef) {
         if (this.isAvailable()) {

@@ -51,7 +51,7 @@ import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
-
+// Netty接受请求的处理类
 public abstract class NettyRemotingAbstract {
 
     /**
@@ -184,6 +184,7 @@ public abstract class NettyRemotingAbstract {
 
 
     /**
+     * 处理远程同伴发来的请求
      * Process incoming request command issued by remote peer.
      *
      * @param ctx channel handler context.
@@ -220,10 +221,12 @@ public abstract class NettyRemotingAbstract {
                                 }
                             }
                         };
+                        // CallBack形式处理请求
                         if (pair.getObject1() instanceof AsyncNettyRequestProcessor) {
                             AsyncNettyRequestProcessor processor = (AsyncNettyRequestProcessor)pair.getObject1();
                             processor.asyncProcessRequest(ctx, cmd, callback);
                         } else {
+                            // 同步形式处理请求
                             NettyRequestProcessor processor = pair.getObject1();
                             RemotingCommand response = processor.processRequest(ctx, cmd);
                             callback.callback(response);

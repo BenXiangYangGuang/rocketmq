@@ -60,7 +60,7 @@ public interface MessageStore {
     void destroy();
 
     /**
-     * 异步存储消息，存储完毕再通知客户端
+     * 异步存储消息，不用等待结果，处理下一个异步请求
      * Store a message into store in async manner, the processor can process the next request
      *  rather than wait for result
      *  when result is completed, notify the client in async manner

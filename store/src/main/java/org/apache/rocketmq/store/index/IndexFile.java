@@ -44,7 +44,7 @@ public class IndexFile {
     // 索引的MappedFile
     private final MappedFile mappedFile;
     private final FileChannel fileChannel;
-    //MappedFile中的直接内存
+    //MappedFile中的MappedByteBuffer直接内存
     private final MappedByteBuffer mappedByteBuffer;
     // 索引头
     private final IndexHeader indexHeader;

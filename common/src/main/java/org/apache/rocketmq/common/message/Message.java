@@ -155,7 +155,7 @@ public class Message implements Serializable {
     public void setDelayTimeLevel(int level) {
         this.putProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL, String.valueOf(level));
     }
-
+    // 是否等待服务器将这一条消息存储完毕再返回（等待刷盘完成），还是直接处理其他写队列里面的请求
     public boolean isWaitStoreMsgOK() {
         String result = this.getProperty(MessageConst.PROPERTY_WAIT_STORE_MSG_OK);
         if (null == result)
