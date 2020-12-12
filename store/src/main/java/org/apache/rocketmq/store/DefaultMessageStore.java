@@ -163,7 +163,7 @@ public class DefaultMessageStore implements MessageStore {
         this.allocateMappedFileService.start();
 
         this.indexService.start();
-
+        // 构建两个分发队列
         this.dispatcherList = new LinkedList<>();
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
@@ -309,6 +309,7 @@ public class DefaultMessageStore implements MessageStore {
         this.storeStatsService.start();
 
         this.createTempFile();
+        // 提交定时commitlog、consumequeue文件的删除任务
         this.addScheduleTask();
         this.shutdown = false;
     }
@@ -967,7 +968,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return result;
     }
-
+    // 手动删除文件
     @Override
     public void executeDeleteFilesManually() {
         this.cleanCommitLogService.excuteDeleteFilesManualy();
@@ -1084,7 +1085,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return 0;
     }
-
+    // 删除过期的ConsumeQueue
     public void cleanExpiredConsumerQueue() {
         long minCommitLogOffset = this.commitLog.getMinOffset();
 
@@ -1334,14 +1335,15 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private void addScheduleTask() {
-
+        // 定时清除commitlog、consumequeue文件
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
+            // cleanResourceInterval 清除commitlog、consumequeue文件，时间间隔10秒
             @Override
             public void run() {
                 DefaultMessageStore.this.cleanFilesPeriodically();
             }
         }, 1000 * 60, this.messageStoreConfig.getCleanResourceInterval(), TimeUnit.MILLISECONDS);
-
+        // commitlog、consumequeue文件自检，查看是否被破坏，10分钟一次
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -1376,18 +1378,19 @@ public class DefaultMessageStore implements MessageStore {
         // DefaultMessageStore.this.cleanExpiredConsumerQueue();
         // }
         // }, 1, 1, TimeUnit.HOURS);
+        // 10秒检测一次磁盘空间是否还有可利用空间
         this.diskCheckScheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 DefaultMessageStore.this.cleanCommitLogService.isSpaceFull();
             }
         }, 1000L, 10000L, TimeUnit.MILLISECONDS);
     }
-
+    // 定期删除文件
     private void cleanFilesPeriodically() {
         this.cleanCommitLogService.run();
         this.cleanConsumeQueueService.run();
     }
-
+    // commitlog、consumequeue文件自检，查看是否被破坏
     private void checkSelf() {
         this.commitLog.checkSelf();
 
@@ -1665,11 +1668,12 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     class CleanCommitLogService {
-
+        // 最大人为删除次数
         private final static int MAX_MANUAL_DELETE_FILE_TIMES = 20;
+        //通过系统参数设置-Drocketmq.broker.diskSpaceWarningLevelRatio，默认值0.9，如果磁盘分区使用率超过该阈值，将设置磁盘不可写，此时会拒绝新消息的写入。
         private final double diskSpaceWarningLevelRatio =
             Double.parseDouble(System.getProperty("rocketmq.broker.diskSpaceWarningLevelRatio", "0.90"));
-
+        // 通过系统参数设置，默认0.85,如果磁盘分区使用超过该阈值，建议立即执行过期文件清除，但不会拒绝新消息的写入。
         private final double diskSpaceCleanForciblyRatio =
             Double.parseDouble(System.getProperty("rocketmq.broker.diskSpaceCleanForciblyRatio", "0.85"));
         private long lastRedeleteTimestamp = 0;
@@ -1677,37 +1681,46 @@ public class DefaultMessageStore implements MessageStore {
         private volatile int manualDeleteFileSeveralTimes = 0;
 
         private volatile boolean cleanImmediately = false;
-
+        // 手动删除文件
         public void excuteDeleteFilesManualy() {
+            // 最大人为删除次数，20
             this.manualDeleteFileSeveralTimes = MAX_MANUAL_DELETE_FILE_TIMES;
             DefaultMessageStore.log.info("executeDeleteFilesManually was invoked");
         }
-
+        // 运行方法，并非线程的run方法
         public void run() {
             try {
+                // 删除过期commitlog文件
                 this.deleteExpiredFiles();
-
+                // 重新删除第一个文件
                 this.redeleteHangedFile();
             } catch (Throwable e) {
                 DefaultMessageStore.log.warn(this.getServiceName() + " service has exception. ", e);
             }
         }
-
+        // 删除过期commitlog文件
         private void deleteExpiredFiles() {
+            // 删除的数量
             int deleteCount = 0;
+            // 消息保留72小时
             long fileReservedTime = DefaultMessageStore.this.getMessageStoreConfig().getFileReservedTime();
+            // 删除文件的两次间隔时间 10ms
             int deletePhysicFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteCommitLogFilesInterval();
+            // 在清除过期文件时，如果该文件被其他线程占用（引用次数大于0，比如读取消息），此时会阻止此次删除任务，同时在第一次试图删除该文件时记录当前时间戳，
+            // destroyMappedFileIntervalForcibly表示第一次拒绝删除之后能保留的最大时间，在此时间内，同样可以被拒绝删除，同时会将引用减少1000个，超过该时间后，文件将被强制删除。
             int destroyMapedFileIntervalForcibly = DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();
-
+            // 是否到了删除时间凌晨4点
             boolean timeup = this.isTimeToDelete();
+            // 磁盘是否可以继续使用
             boolean spacefull = this.isSpaceToDelete();
+            // 手动人为删除次数，初始化20次
             boolean manualDelete = this.manualDeleteFileSeveralTimes > 0;
-
+            // 一项满足进行磁盘文件删除
             if (timeup || spacefull || manualDelete) {
-
+                // 次数-1
                 if (manualDelete)
                     this.manualDeleteFileSeveralTimes--;
-
+                // 立马删除
                 boolean cleanAtOnce = DefaultMessageStore.this.getMessageStoreConfig().isCleanFileForciblyEnable() && this.cleanImmediately;
 
                 log.info("begin to delete before {} hours file. timeup: {} spacefull: {} manualDeleteFileSeveralTimes: {} cleanAtOnce: {}",
@@ -1718,7 +1731,7 @@ public class DefaultMessageStore implements MessageStore {
                     cleanAtOnce);
 
                 fileReservedTime *= 60 * 60 * 1000;
-
+                // 删除文件个数
                 deleteCount = DefaultMessageStore.this.commitLog.deleteExpiredFile(fileReservedTime, deletePhysicFilesInterval,
                     destroyMapedFileIntervalForcibly, cleanAtOnce);
                 if (deleteCount > 0) {
@@ -1727,14 +1740,16 @@ public class DefaultMessageStore implements MessageStore {
                 }
             }
         }
-
+        // 重新删除第一个文件
         private void redeleteHangedFile() {
+            // 重新删除悬挂文件的间隔 120秒
             int interval = DefaultMessageStore.this.getMessageStoreConfig().getRedeleteHangedFileInterval();
             long currentTimestamp = System.currentTimeMillis();
             if ((currentTimestamp - this.lastRedeleteTimestamp) > interval) {
                 this.lastRedeleteTimestamp = currentTimestamp;
                 int destroyMapedFileIntervalForcibly =
                     DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();
+                // 重新删除第一个文件
                 if (DefaultMessageStore.this.commitLog.retryDeleteFirstFile(destroyMapedFileIntervalForcibly)) {
                 }
             }
@@ -1743,7 +1758,7 @@ public class DefaultMessageStore implements MessageStore {
         public String getServiceName() {
             return CleanCommitLogService.class.getSimpleName();
         }
-
+        // 是否到了删除时间凌晨4点
         private boolean isTimeToDelete() {
             String when = DefaultMessageStore.this.getMessageStoreConfig().getDeleteWhen();
             if (UtilAll.isItTimeToDo(when)) {
@@ -1753,15 +1768,18 @@ public class DefaultMessageStore implements MessageStore {
 
             return false;
         }
-
+        //磁盘是否可以继续使用
         private boolean isSpaceToDelete() {
+            // 磁盘空间使用率95%
             double ratio = DefaultMessageStore.this.getMessageStoreConfig().getDiskMaxUsedSpaceRatio() / 100.0;
-
+            // 是否立马删除
             cleanImmediately = false;
 
             {
                 String storePathPhysic = DefaultMessageStore.this.getMessageStoreConfig().getStorePathCommitLog();
+                // 磁盘空间使用率
                 double physicRatio = UtilAll.getDiskPartitionSpaceUsedPercent(storePathPhysic);
+                // > 0.9 拒绝消息写入
                 if (physicRatio > diskSpaceWarningLevelRatio) {
                     boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskFull();
                     if (diskok) {
@@ -1769,21 +1787,23 @@ public class DefaultMessageStore implements MessageStore {
                     }
 
                     cleanImmediately = true;
+                    // 立即执行过期文件清除，但不会拒绝新消息的写入
                 } else if (physicRatio > diskSpaceCleanForciblyRatio) {
                     cleanImmediately = true;
                 } else {
+                    // 磁盘ok
                     boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskOK();
                     if (!diskok) {
                         DefaultMessageStore.log.info("physic disk space OK " + physicRatio + ", so mark disk ok");
                     }
                 }
-
+                // 磁盘坏了或者超过95%
                 if (physicRatio < 0 || physicRatio > ratio) {
                     DefaultMessageStore.log.info("physic disk maybe full soon, so reclaim space, " + physicRatio);
                     return true;
                 }
             }
-
+            // consumequeue的判断
             {
                 String storePathLogics = StorePathConfigHelper
                     .getStorePathConsumeQueue(DefaultMessageStore.this.getMessageStoreConfig().getStorePathRootDir());
@@ -1820,13 +1840,18 @@ public class DefaultMessageStore implements MessageStore {
         public void setManualDeleteFileSeveralTimes(int manualDeleteFileSeveralTimes) {
             this.manualDeleteFileSeveralTimes = manualDeleteFileSeveralTimes;
         }
+        // 检测磁盘使用空间是否超过了95%
         public boolean isSpaceFull() {
+            // commitlog文件木
             String storePathPhysic = DefaultMessageStore.this.getMessageStoreConfig().getStorePathCommitLog();
+            // 磁盘空间使用率
             double physicRatio = UtilAll.getDiskPartitionSpaceUsedPercent(storePathPhysic);
+            // 硬盘最大使用率95
             double ratio = DefaultMessageStore.this.getMessageStoreConfig().getDiskMaxUsedSpaceRatio() / 100.0;
             if (physicRatio > ratio) {
                 DefaultMessageStore.log.info("physic disk of commitLog used: " + physicRatio);
             }
+            // 磁盘满了
             if (physicRatio > this.diskSpaceWarningLevelRatio) {
                 boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskFull();
                 if (diskok) {
@@ -1834,6 +1859,7 @@ public class DefaultMessageStore implements MessageStore {
                 }
 
                 return true;
+            // 未满
             } else {
                 boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskOK();
 
@@ -1845,7 +1871,7 @@ public class DefaultMessageStore implements MessageStore {
             }
         }
     }
-
+    // 删除consumequeue、indexfile文件，主要根据commitlog文件的最小offset进行删除consumequeue、indexfile文件删除
     class CleanConsumeQueueService {
         private long lastPhysicalMinOffset = 0;
 
@@ -1858,8 +1884,9 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         private void deleteExpiredFiles() {
+            // 删除ConsumeQueue文件的两次间隔时间 100ms
             int deleteLogicsFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteConsumeQueueFilesInterval();
-
+            // 获取commitlog的最小offset
             long minOffset = DefaultMessageStore.this.commitLog.getMinOffset();
             if (minOffset > this.lastPhysicalMinOffset) {
                 this.lastPhysicalMinOffset = minOffset;
@@ -1878,7 +1905,7 @@ public class DefaultMessageStore implements MessageStore {
                         }
                     }
                 }
-
+                // 定时删除IndexFile文件
                 DefaultMessageStore.this.indexService.deleteExpiredFile(minOffset);
             }
         }

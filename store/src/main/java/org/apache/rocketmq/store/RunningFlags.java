@@ -28,9 +28,9 @@ public class RunningFlags {
     private static final int WRITE_LOGICS_QUEUE_ERROR_BIT = 1 << 2;
 
     private static final int WRITE_INDEX_FILE_ERROR_BIT = 1 << 3;
-
+    // 磁盘满了
     private static final int DISK_FULL_BIT = 1 << 4;
-
+    // broker运行状态
     private volatile int flagBits = 0;
 
     public RunningFlags() {

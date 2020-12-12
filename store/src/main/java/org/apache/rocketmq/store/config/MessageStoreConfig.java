@@ -70,18 +70,24 @@ public class MessageStoreConfig {
     // ConsumeQueue flush interval
     private int flushIntervalConsumeQueue = 1000;
     // Resource reclaim interval
+    // 清除commitlog、consumequeue文件，时间间隔
     private int cleanResourceInterval = 10000;
+    // 删除commitlog文件的两次间隔时间
     // CommitLog removal interval
     private int deleteCommitLogFilesInterval = 100;
     // ConsumeQueue removal interval
+    // 删除ConsumeQueue文件的两次间隔时间 100ms
     private int deleteConsumeQueueFilesInterval = 100;
     private int destroyMapedFileIntervalForcibly = 1000 * 120;
+    // 重新删除悬挂文件的间隔
     private int redeleteHangedFileInterval = 1000 * 120;
     // When to delete,default is at 4 am
+    // 删除时间凌晨4点
     @ImportantField
     private String deleteWhen = "04";
     private int diskMaxUsedSpaceRatio = 75;
     // The number of hours to keep a log file before deleting it (in hours)
+    // 消息多留多长时间
     @ImportantField
     private int fileReservedTime = 72;
     // Flow control for ConsumeQueue
@@ -142,6 +148,7 @@ public class MessageStoreConfig {
     private int syncFlushTimeout = 1000 * 5;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
     private long flushDelayOffsetInterval = 1000 * 10;
+    // 是否可强力删除
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
     // mappedFile 热交换
@@ -319,7 +326,7 @@ public class MessageStoreConfig {
     public void setDeleteWhen(String deleteWhen) {
         this.deleteWhen = deleteWhen;
     }
-
+    // 磁盘最大空间使用率
     public int getDiskMaxUsedSpaceRatio() {
         if (this.diskMaxUsedSpaceRatio < 10)
             return 10;

@@ -98,7 +98,7 @@ public class IndexService {
 
         return true;
     }
-
+    // 定时删除IndexFile文件
     public void deleteExpiredFile(long offset) {
         Object[] files = null;
         try {

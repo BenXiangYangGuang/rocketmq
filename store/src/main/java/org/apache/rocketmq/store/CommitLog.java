@@ -156,10 +156,10 @@ public class CommitLog {
 
     /**
      * 删除失效文件
-     * @param expiredTime
-     * @param deleteFilesInterval
-     * @param intervalForcibly
-     * @param cleanImmediately
+     * @param expiredTime 消息保留72小时
+     * @param deleteFilesInterval 两次删除间隔
+     * @param intervalForcibly 表示第一次拒绝删除之后能保留的最大时间，在此时间内，同样可以被拒绝删除，同时会将引用减少1000个，超过该时间后，文件将被强制删除。
+     * @param cleanImmediately 是否立马删除
      * @return
      */
     public int deleteExpiredFile(

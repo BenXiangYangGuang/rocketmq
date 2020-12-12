@@ -203,7 +203,7 @@ public class UtilAll {
             cal.get(Calendar.MINUTE),
             cal.get(Calendar.SECOND));
     }
-
+    // 磁盘分区文件使用率
     public static double getDiskPartitionSpaceUsedPercent(final String path) {
         if (null == path || path.isEmpty())
             return -1;
