@@ -22,10 +22,10 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-
+// WaitNotifyObject是用来管理多个线程被等待、唤醒等操作的对象
 public class WaitNotifyObject {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
-
+    // 存储线程和线程是否被通知
     protected final HashMap<Long/* thread id */, Boolean/* notified */> waitingThreadTable =
         new HashMap<Long, Boolean>(16);
 
@@ -97,7 +97,7 @@ public class WaitNotifyObject {
             }
         }
     }
-
+    // 从集合中移除这个Thread
     public void removeFromWaitingThreadTable() {
         long currentThreadId = Thread.currentThread().getId();
         synchronized (this) {

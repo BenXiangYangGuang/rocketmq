@@ -30,21 +30,29 @@ import java.util.Collections;
  * Filter data of consumer.
  */
 public class ConsumerFilterData {
-
+    // 消费者组
     private String consumerGroup;
+    // topic
     private String topic;
+    // 表达式
     private String expression;
+    // 表达式类型：默认3中；sql、Java正则、
     private String expressionType;
+    // 过滤的表达式
     private transient Expression compiledExpression;
+    // 诞生时间
     private long bornTime;
+    // 死亡时间
     private long deadTime = 0;
+    // 布隆过滤
     private BloomFilterData bloomFilterData;
+    // 客户端版本
     private long clientVersion;
-
+    // 是否死亡
     public boolean isDead() {
         return this.deadTime >= this.bornTime;
     }
-
+    // 死亡多久
     public long howLongAfterDeath() {
         if (isDead()) {
             return System.currentTimeMillis() - getDeadTime();

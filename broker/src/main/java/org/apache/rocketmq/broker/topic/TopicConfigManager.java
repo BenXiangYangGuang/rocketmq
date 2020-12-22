@@ -45,13 +45,16 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
  */
 public class TopicConfigManager extends ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
+    // 锁超时时间
     private static final long LOCK_TIMEOUT_MILLIS = 3000;
+    // 定时功能的topic的数量，比如延迟5ms、10ms、1h、8h等共18个等级
     private static final int SCHEDULE_TOPIC_QUEUE_NUM = 18;
-
+    // topic信息可重入锁
     private transient final Lock lockTopicConfigTable = new ReentrantLock();
 
     private final ConcurrentMap<String, TopicConfig> topicConfigTable =
         new ConcurrentHashMap<String, TopicConfig>(1024);
+    // 数据版本
     private final DataVersion dataVersion = new DataVersion();
     private transient BrokerController brokerController;
 

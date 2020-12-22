@@ -39,17 +39,19 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Consumer filter data manager.Just manage the consumers use expression filter.
+ * 消费者消费消息过滤管理者
  */
 public class ConsumerFilterManager extends ConfigManager {
 
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.FILTER_LOGGER_NAME);
-
+    // 24时转换为毫秒
     private static final long MS_24_HOUR = 24 * 3600 * 1000;
-
+    // 根据topic、消费者组、消费消息的过滤配置
     private ConcurrentMap<String/*Topic*/, FilterDataMapByTopic>
         filterDataByTopic = new ConcurrentHashMap<String/*Topic*/, FilterDataMapByTopic>(256);
 
     private transient BrokerController brokerController;
+    // 布隆过滤器
     private transient BloomFilter bloomFilter;
 
     public ConsumerFilterManager() {
@@ -319,9 +321,9 @@ public class ConsumerFilterManager extends ConfigManager {
     public void setFilterDataByTopic(final ConcurrentHashMap<String, FilterDataMapByTopic> filterDataByTopic) {
         this.filterDataByTopic = filterDataByTopic;
     }
-
+    // 根据topic的过滤的数据
     public static class FilterDataMapByTopic {
-
+        // key：consumerGroup,value:消费要过滤的数据
         private ConcurrentMap<String/*consumer group*/, ConsumerFilterData>
             groupFilterData = new ConcurrentHashMap<String, ConsumerFilterData>();
 

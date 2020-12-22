@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.common;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 public class AclConfig {
@@ -39,5 +40,20 @@ public class AclConfig {
 
     public void setPlainAccessConfigs(List<PlainAccessConfig> plainAccessConfigs) {
         this.plainAccessConfigs = plainAccessConfigs;
+    }
+
+
+    public static void main(String[] args) {
+        ByteBuffer reportOffset = ByteBuffer.allocate(8);
+        reportOffset.position(0);
+        reportOffset.limit(8);
+        reportOffset.putLong(12L);
+        System.out.println("after:");
+        reportOffset.position(0);
+        // System.out.println("after1:"+reportOffset.getLong());
+        reportOffset.limit(8);
+        // System.out.println("after2:"+reportOffset.getLong());
+        // reportOffset.hasRemaining();
+        // System.out.println(reportOffset.position());
     }
 }

@@ -283,7 +283,9 @@ public class MappedFile extends ReferenceResource {
     public long getFileFromOffset() {
         return this.fileFromOffset;
     }
-    // ConsumeQueue的索引条目存储到自己的MappedFile问价
+    // 将消息体追写到mappedFile文件；一下两种使用场景
+    // ConsumeQueue的索引条目存储到自己的MappedFile文件
+    // Slave同步Master的消息数据，写入Slave的commitlog文件
     public boolean appendMessage(final byte[] data) {
         int currentPos = this.wrotePosition.get();
 

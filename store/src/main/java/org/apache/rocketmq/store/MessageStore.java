@@ -308,7 +308,7 @@ public interface MessageStore {
     void updateHaMasterAddress(final String newAddr);
 
     /**
-     * 返回跟随 Master 的 Slave 的broker 的数量
+     * 返回落后 Master 的 Slave 的offset 的数量
      * Return how much the slave falls behind.
      *
      * @return number of bytes that slave falls behind.
@@ -351,7 +351,7 @@ public interface MessageStore {
     boolean checkInDiskByConsumeOffset(final String topic, final int queueId, long consumeOffset);
 
     /**
-     * 获取已经被 commitlog 存储，还有被分发到 consume queue 的字节数量
+     * 获取已经被 commitlog 存储，还没有被分发到 consume queue 的字节数量
      * Get number of the bytes that have been stored in commit log and not yet dispatched to consume queue.
      *
      * @return number of the bytes to dispatch.

@@ -134,17 +134,21 @@ public class MessageStoreConfig {
     @ImportantField
     private boolean messageIndexSafe = false;
     private int haListenPort = 10912;
+    // slave向master发送offset的时间间隔
     private int haSendHeartbeatInterval = 1000 * 5;
+    // Master和Slave连接超时间隔
     private int haHousekeepingInterval = 1000 * 20;
     private int haTransferBatchSize = 1024 * 32;
     @ImportantField
     private String haMasterAddress = null;
+    // slave 最多落后Master 256M
     private int haSlaveFallbehindMax = 1024 * 1024 * 256;
     @ImportantField
     private BrokerRole brokerRole = BrokerRole.ASYNC_MASTER;
     @ImportantField
     // 异步刷盘
     private FlushDiskType flushDiskType = FlushDiskType.ASYNC_FLUSH;
+    // 消息从Master同步到Slave的同步等待时间
     private int syncFlushTimeout = 1000 * 5;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
     private long flushDelayOffsetInterval = 1000 * 10;

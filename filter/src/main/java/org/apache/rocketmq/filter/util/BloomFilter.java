@@ -22,6 +22,7 @@ import com.google.common.hash.Hashing;
 import java.nio.charset.Charset;
 
 /**
+ * 布隆过滤器
  * Simple implement of bloom filter.
  */
 public class BloomFilter {

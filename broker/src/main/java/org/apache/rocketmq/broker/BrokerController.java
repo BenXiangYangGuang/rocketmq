@@ -116,8 +116,10 @@ public class BrokerController {
     private final NettyServerConfig nettyServerConfig;
     private final NettyClientConfig nettyClientConfig;
     private final MessageStoreConfig messageStoreConfig;
+    // 管理消费者组消费的topic下的queue下的offset信息
     private final ConsumerOffsetManager consumerOffsetManager;
     private final ConsumerManager consumerManager;
+    // 消费者过滤消费配置消息
     private final ConsumerFilterManager consumerFilterManager;
     private final ProducerManager producerManager;
     private final ClientHousekeepingService clientHousekeepingService;
@@ -125,6 +127,7 @@ public class BrokerController {
     private final PullRequestHoldService pullRequestHoldService;
     private final MessageArrivingListener messageArrivingListener;
     private final Broker2Client broker2Client;
+    // 消费者组订阅信息
     private final SubscriptionGroupManager subscriptionGroupManager;
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
     private final RebalanceLockManager rebalanceLockManager = new RebalanceLockManager();
@@ -168,6 +171,7 @@ public class BrokerController {
     private BrokerFastFailure brokerFastFailure;
     private Configuration configuration;
     private FileWatchService fileWatchService;
+    // 事务管理者检测服务
     private TransactionalMessageCheckService transactionalMessageCheckService;
     private TransactionalMessageService transactionalMessageService;
     private AbstractTransactionalMessageCheckListener transactionalMessageCheckListener;
@@ -198,7 +202,7 @@ public class BrokerController {
         this.subscriptionGroupManager = new SubscriptionGroupManager(this);
         this.brokerOuterAPI = new BrokerOuterAPI(nettyClientConfig);
         this.filterServerManager = new FilterServerManager(this);
-
+        // Slave同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息
         this.slaveSynchronize = new SlaveSynchronize(this);
 
         this.sendThreadPoolQueue = new LinkedBlockingQueue<Runnable>(this.brokerConfig.getSendThreadPoolQueueCapacity());
@@ -243,10 +247,13 @@ public class BrokerController {
      * @throws CloneNotSupportedException
      */
     public boolean initialize() throws CloneNotSupportedException {
+        // broker启动加载磁盘topic信息磁盘文件
         boolean result = this.topicConfigManager.load();
-
+        // broker启动加载磁盘topic被消费者组的消费的队列的offset磁盘文件
         result = result && this.consumerOffsetManager.load();
+        // 消费者组订阅信息
         result = result && this.subscriptionGroupManager.load();
+        // 消费者组需要过滤的消息的配置信息
         result = result && this.consumerFilterManager.load();
 
         if (result) {
@@ -352,6 +359,7 @@ public class BrokerController {
 
 
             final long initialDelay = UtilAll.computeNextMorningTimeMillis() - System.currentTimeMillis();
+            // broker定时统计任务
             final long period = 1000 * 60 * 60 * 24;
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
@@ -363,7 +371,7 @@ public class BrokerController {
                     }
                 }
             }, initialDelay, period, TimeUnit.MILLISECONDS);
-
+            // 管理消费者组消费的topic下的queue下的offset信息
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -374,11 +382,12 @@ public class BrokerController {
                     }
                 }
             }, 1000 * 10, this.brokerConfig.getFlushConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
-
+            // 消费者过滤消费配置消息
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        // 消费者过滤消费配置消息
                         BrokerController.this.consumerFilterManager.persist();
                     } catch (Throwable e) {
                         log.error("schedule persist consumer filter error.", e);
@@ -407,7 +416,7 @@ public class BrokerController {
                     }
                 }
             }, 10, 1, TimeUnit.SECONDS);
-
+            // 获取已经被 commitlog 存储，还没有被分发到 consume queue 的字节数量
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
                 @Override
@@ -436,20 +445,25 @@ public class BrokerController {
                     }
                 }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
             }
-
+            // 是否开启DLegerCommitLog的消息HA同步
             if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+                // Broker的Slave角色
                 if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
+                    // 判断是否定期更新HAMasterAddress地址
                     if (this.messageStoreConfig.getHaMasterAddress() != null && this.messageStoreConfig.getHaMasterAddress().length() >= 6) {
+                        // 一次性更新HAMasterAddress地址
                         this.messageStore.updateHaMasterAddress(this.messageStoreConfig.getHaMasterAddress());
                         this.updateMasterHAServerAddrPeriodically = false;
                     } else {
                         this.updateMasterHAServerAddrPeriodically = true;
                     }
+                //  Master角色，打印Slave同步Master的commitlog落后的offset数量
                 } else {
                     this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                         @Override
                         public void run() {
                             try {
+                                //打印Slave同步Master的commitlog落后的offset数量
                                 BrokerController.this.printMasterAndSlaveDiff();
                             } catch (Throwable e) {
                                 log.error("schedule printMasterAndSlaveDiff error.", e);
@@ -553,9 +567,9 @@ public class BrokerController {
         }
     }
 
-
+    // 初始化Rpc钩子
     private void initialRpcHooks() {
-
+        // META-INF/service/org.apache.rocketmq.remoting.RPCHook
         List<RPCHook> rpcHooks = ServiceProvider.load(ServiceProvider.RPC_HOOK_ID, RPCHook.class);
         if (rpcHooks == null || rpcHooks.isEmpty()) {
             return;
@@ -719,7 +733,7 @@ public class BrokerController {
     public void setMessageStore(MessageStore messageStore) {
         this.messageStore = messageStore;
     }
-
+    // 打印Slave同步Master的commitlog落后的offset数量
     private void printMasterAndSlaveDiff() {
         long diff = this.messageStore.slaveFallBehindMuch();
 
@@ -906,10 +920,13 @@ public class BrokerController {
         if (this.filterServerManager != null) {
             this.filterServerManager.start();
         }
-
+        // 是否开启DLeger同步CommitLog，不开启DLeger
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+            // Master节点检测事务消息状态
             startProcessorByHa(messageStoreConfig.getBrokerRole());
+            // Slave向Master发送请求，同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息等
             handleSlaveSynchronize(messageStoreConfig.getBrokerRole());
+            // 单个Broker同步信息完毕，然后将这个Broker注册到所有的NameServer
             this.registerBrokerAll(true, false, true);
         }
         /**
@@ -930,7 +947,7 @@ public class BrokerController {
         if (this.brokerStatsManager != null) {
             this.brokerStatsManager.start();
         }
-
+        // broker快速失败
         if (this.brokerFastFailure != null) {
             this.brokerFastFailure.start();
         }
@@ -957,10 +974,10 @@ public class BrokerController {
     }
 
     /**
-     * 注册 Broker 到 NameServer
-     * @param checkOrderConfig
-     * @param oneway
-     * @param forceRegister
+     * 注册 Broker 到所有的NameServer
+     * @param checkOrderConfig true
+     * @param oneway false
+     * @param forceRegister true
      */
     public synchronized void registerBrokerAll(final boolean checkOrderConfig, boolean oneway, boolean forceRegister) {
         TopicConfigSerializeWrapper topicConfigWrapper = this.getTopicConfigManager().buildTopicConfigSerializeWrapper();
@@ -982,11 +999,11 @@ public class BrokerController {
             this.brokerConfig.getBrokerName(),
             this.brokerConfig.getBrokerId(),
             this.brokerConfig.getRegisterBrokerTimeoutMills())) {
-            // 注册
+            // Broker向所有的NameServer注册
             doRegisterBrokerAll(checkOrderConfig, oneway, topicConfigWrapper);
         }
     }
-    // 注册和注册结果
+    // Broker向所有的NameServer注册和注册结果
     private void doRegisterBrokerAll(boolean checkOrderConfig, boolean oneway,
         TopicConfigSerializeWrapper topicConfigWrapper) {
         // 注册结果
@@ -1167,12 +1184,17 @@ public class BrokerController {
         return accessValidatorMap;
     }
 
+    // Slave向Master发送请求，同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息等
     private void handleSlaveSynchronize(BrokerRole role) {
+        // Slave 角色
         if (role == BrokerRole.SLAVE) {
+            // 取消slaveSyncFuture同步任务，然后进行新的同步任务
             if (null != slaveSyncFuture) {
                 slaveSyncFuture.cancel(false);
             }
             this.slaveSynchronize.setMasterAddr(null);
+            // Slave向Master发送请求，同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息等
+            // 定时执行同步任务，返回一个slaveSyncFuture对象
             slaveSyncFuture = this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -1184,11 +1206,14 @@ public class BrokerController {
                     }
                 }
             }, 1000 * 3, 1000 * 10, TimeUnit.MILLISECONDS);
+        //    Master角色
         } else {
             //handle the slave synchronise
+            // 取消slaveSyncFuture同步任务
             if (null != slaveSyncFuture) {
                 slaveSyncFuture.cancel(false);
             }
+            // Master设置自己Master的Address为null；
             this.slaveSynchronize.setMasterAddr(null);
         }
     }
@@ -1226,7 +1251,7 @@ public class BrokerController {
     }
 
 
-
+    // 改变为Master角色
     public void changeToMaster(BrokerRole role) {
         if (role == BrokerRole.SLAVE) {
             return;
@@ -1261,7 +1286,7 @@ public class BrokerController {
         }
         log.info("Finish to change to master brokerName={}", brokerConfig.getBrokerName());
     }
-
+    // Master节点检测事务消息状态
     private void startProcessorByHa(BrokerRole role) {
         if (BrokerRole.SLAVE != role) {
             if (this.transactionalMessageCheckService != null) {

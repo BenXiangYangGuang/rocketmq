@@ -15,9 +15,11 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.common;
-
+// 消息过滤类型
 public enum TopicFilterType {
+    // 单个tag标签
     SINGLE_TAG,
+    // 多个标签
     MULTI_TAG
 
 }

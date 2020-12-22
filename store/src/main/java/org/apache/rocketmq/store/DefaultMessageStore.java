@@ -132,6 +132,7 @@ public class DefaultMessageStore implements MessageStore {
         this.messageStoreConfig = messageStoreConfig;
         this.brokerStatsManager = brokerStatsManager;
         this.allocateMappedFileService = new AllocateMappedFileService(this);
+        // 是否启用 dledger，构建高可用、高持久化、强一致性的 commitlog 服务
         if (messageStoreConfig.isEnableDLegerCommitLog()) {
             this.commitLog = new DLedgerCommitLog(this);
         } else {
@@ -144,9 +145,13 @@ public class DefaultMessageStore implements MessageStore {
         this.cleanConsumeQueueService = new CleanConsumeQueueService();
         this.storeStatsService = new StoreStatsService();
         this.indexService = new IndexService(this);
+        // 是否启用 dledger，构建高可用、高持久化、强一致性的 commitlog 服务
+        // 不启用dledger
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
             this.haService = new HAService(this);
         } else {
+            // 启用dleger，他有自己的集群方案，比如选举、commitlog的复制、集群的同步等等。
+            // 启用dleger之后，CommitLog会采用子类DLedgerCommitLog
             this.haService = null;
         }
         this.reputMessageService = new ReputMessageService();
@@ -297,9 +302,12 @@ public class DefaultMessageStore implements MessageStore {
             }
             this.recoverTopicQueueTable();
         }
-
+        // 是否启用 dledger，构建高可用、高持久化、强一致性的 commitlog 服务
+        // 不启用dledger,开启本身的HAService(不是Deleger的HA服务)，并启动Master和Slave数据同步服务、处理延迟定时消息服务
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+            // Master和Slave数据同步服务
             this.haService.start();
+            // 处理延迟定时消息服务
             this.handleScheduleMessageService(messageStoreConfig.getBrokerRole());
         }
         //consumeQueue 刷盘服务
@@ -389,7 +397,7 @@ public class DefaultMessageStore implements MessageStore {
             log.warn("putMessage message topic length too long " + msg.getTopic().length());
             return PutMessageStatus.MESSAGE_ILLEGAL;
         }
-        // messag property 小于  32767 byte
+        // message property 小于  32767 byte
         if (msg.getPropertiesString() != null && msg.getPropertiesString().length() > Short.MAX_VALUE) {
             log.warn("putMessage message properties length too long " + msg.getPropertiesString().length());
             return PutMessageStatus.MESSAGE_ILLEGAL;
@@ -951,16 +959,17 @@ public class DefaultMessageStore implements MessageStore {
 
         return this.commitLog.getData(offset);
     }
-
+    // Slave同步Master的消息数据，写入Slave的commitlog文件，Slave同步Master的消息数据，写入Slave的commitlog文件
     @Override
     public boolean appendToCommitLog(long startOffset, byte[] data) {
         if (this.shutdown) {
             log.warn("message store has shutdown, so appendToPhyQueue is forbidden");
             return false;
         }
-
+        // Slave同步Master的消息数据，写入Slave的commitlog文件
         boolean result = this.commitLog.appendData(startOffset, data);
         if (result) {
+            // 存储成功，commitlog文件异步分发构建ConsumeQueue和Index索引服务
             this.reputMessageService.wakeup();
         } else {
             log.error("appendToPhyQueue failed " + startOffset + " " + data.length);

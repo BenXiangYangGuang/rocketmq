@@ -54,7 +54,7 @@ public class RemotingUtil {
     public static boolean isWindowsPlatform() {
         return isWindowsPlatform;
     }
-
+    // 打开一个Selector
     public static Selector openSelector() throws IOException {
         Selector result = null;
 
@@ -142,7 +142,7 @@ public class RemotingUtil {
             return localHost.getHostAddress();
         }
     }
-
+    //address:port转换为InetSocketAddress
     public static SocketAddress string2SocketAddress(final String addr) {
         int split = addr.lastIndexOf(":");
         String host = addr.substring(0, split);

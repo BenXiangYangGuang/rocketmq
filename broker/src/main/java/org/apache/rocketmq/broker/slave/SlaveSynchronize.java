@@ -27,7 +27,7 @@ import org.apache.rocketmq.common.protocol.body.ConsumerOffsetSerializeWrapper;
 import org.apache.rocketmq.common.protocol.body.SubscriptionGroupWrapper;
 import org.apache.rocketmq.common.protocol.body.TopicConfigSerializeWrapper;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
-
+//Slave向Master发送请求，同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息等，并持久化到磁盘文件
 public class SlaveSynchronize {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -46,26 +46,35 @@ public class SlaveSynchronize {
     }
 
     public void syncAll() {
+        //Slave向Master发送请求，同步Master的Topic配置信息、消费者组消费的consumeroffset、同步延迟消费的偏移量信息、订阅者组信息等，并持久化到磁盘文件
         this.syncTopicConfig();
         this.syncConsumerOffset();
+
         this.syncDelayOffset();
         this.syncSubscriptionGroupConfig();
     }
 
     private void syncTopicConfig() {
+        // Slave节点从属的Master节点的Address
         String masterAddrBak = this.masterAddr;
+        // 存在且不等于本BrokerAddress
         if (masterAddrBak != null && !masterAddrBak.equals(brokerController.getBrokerAddr())) {
             try {
+                // 从Master中获取TopicConfig信息
                 TopicConfigSerializeWrapper topicWrapper =
                     this.brokerController.getBrokerOuterAPI().getAllTopicConfig(masterAddrBak);
+                // 比较版本号是否一致，不一致更新
                 if (!this.brokerController.getTopicConfigManager().getDataVersion()
                     .equals(topicWrapper.getDataVersion())) {
-
+                    // 更新TopicConfig中的版本号信息
                     this.brokerController.getTopicConfigManager().getDataVersion()
                         .assignNewOne(topicWrapper.getDataVersion());
+                    // 清空TopicConfigManager中TopicConfig信息
                     this.brokerController.getTopicConfigManager().getTopicConfigTable().clear();
+                    // 赋值新的信息
                     this.brokerController.getTopicConfigManager().getTopicConfigTable()
                         .putAll(topicWrapper.getTopicConfigTable());
+                    // 进行持久化
                     this.brokerController.getTopicConfigManager().persist();
 
                     log.info("Update slave topic config from master, {}", masterAddrBak);

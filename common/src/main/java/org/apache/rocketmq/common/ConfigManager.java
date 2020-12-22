@@ -23,9 +23,9 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 
 public abstract class ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
-
+    // 编码
     public abstract String encode();
-
+    // 加载文件
     public boolean load() {
         String fileName = null;
         try {
@@ -46,7 +46,7 @@ public abstract class ConfigManager {
     }
 
     public abstract String configFilePath();
-
+    // 加载备份文件
     private boolean loadBak() {
         String fileName = null;
         try {
@@ -64,9 +64,9 @@ public abstract class ConfigManager {
 
         return true;
     }
-
+    // 解码
     public abstract void decode(final String jsonString);
-
+    // 持久化到文件
     public synchronized void persist() {
         String jsonString = this.encode(true);
         if (jsonString != null) {

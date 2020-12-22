@@ -137,7 +137,7 @@ public class MixAll {
 
         return 0;
     }
-
+    // string串写到文件
     public static void string2File(final String str, final String fileName) throws IOException {
 
         String tmpFile = fileName + ".tmp";

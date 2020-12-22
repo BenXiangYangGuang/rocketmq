@@ -32,12 +32,12 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
-
+// 消费者组消费topic信息，包括topic、group、queueId，消费offset等信息
 public class ConsumerOffsetManager extends ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final String TOPIC_GROUP_SEPARATOR = "@";
-
-    private ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
+    // topic、消费组、queueId、offset信息集合
+    private ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer/*queueId*/, Long/*offset*/>> offsetTable =
         new ConcurrentHashMap<String, ConcurrentMap<Integer, Long>>(512);
 
     private transient BrokerController brokerController;
@@ -67,21 +67,23 @@ public class ConsumerOffsetManager extends ConfigManager {
             }
         }
     }
-
+    // 一个topic下consumequeue的持久化的offset，是否小于内存中的consumequeue的offset信息；小于返回true；否则返回false
     private boolean offsetBehindMuchThanData(final String topic, ConcurrentMap<Integer, Long> table) {
         Iterator<Entry<Integer, Long>> it = table.entrySet().iterator();
         boolean result = !table.isEmpty();
-
+        // 遍历一个topic下的多个queueId
         while (it.hasNext() && result) {
             Entry<Integer, Long> next = it.next();
+            //获取一个topic，一个消息队列的最小的offset
             long minOffsetInStore = this.brokerController.getMessageStore().getMinOffsetInQueue(topic, next.getKey());
+            // 持久化的consumeoffset
             long offsetInPersist = next.getValue();
             result = offsetInPersist <= minOffsetInStore;
         }
 
         return result;
     }
-
+    // 这个group消费的topic集合
     public Set<String> whichTopicByConsumer(final String group) {
         Set<String> topics = new HashSet<String>();
 
@@ -99,7 +101,7 @@ public class ConsumerOffsetManager extends ConfigManager {
 
         return topics;
     }
-
+    // 这个topic由哪些consumegroup消费
     public Set<String> whichGroupByTopic(final String topic) {
         Set<String> groups = new HashSet<String>();
 

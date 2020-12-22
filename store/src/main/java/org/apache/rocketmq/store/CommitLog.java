@@ -1049,7 +1049,7 @@ public class CommitLog {
     /**
      * 一条消息进行刷盘
      * @param result 扩展到内存ByteBuffer的结果
-     * @param putMessageResult 放入ByteBuffer这个过程的结果
+     * @param putMessageResult 放入ByteBuffer这个过程的结果（存放消息的结果）
      * @param messageExt 存放的消息
      */
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
@@ -1096,21 +1096,38 @@ public class CommitLog {
         }
     }
 
+    /**
+     * commitlog的高可用，不同节点之间的构成commitlog的message复制，每条消息进行一次方法调用
+     * @param result 追加消息到ByteBuffer中的返回结果
+     * @param putMessageResult 放入ByteBuffer这个过程的结果（存放消息的结果）
+     * @param messageExt 需要存放的消息
+     */
     public void handleHA(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
+        // 是同步Master的角色
         if (BrokerRole.SYNC_MASTER == this.defaultMessageStore.getMessageStoreConfig().getBrokerRole()) {
+            // HA服务
             HAService service = this.defaultMessageStore.getHaService();
+            // 是否等待消息落盘完毕
             if (messageExt.isWaitStoreMsgOK()) {
                 // Determine whether to wait
+                // 推送这条消息，Slave是否可以接受这条消息推送
                 if (service.isSlaveOK(result.getWroteOffset() + result.getWroteBytes())) {
+                    // 构建Master到Slave的同步请求
                     GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
+                    // 放入请求，并唤醒处理这个request的服务：HAService#GroupTransferService的doWaitTransfer()方法，处理这个request。
                     service.putRequest(request);
+                    // HAService#WaitNotifyObject对象
+                    // 一个Slave到Master的连接，一个HAConnection对象，一个WriteSocketService对象，一个线程，将这个线程放入waitingThreadTable中，被设置这个线程未被通知的状态;
+                    // 这里的作用是唤醒所有等待的Master向Slave写CommitLog的message线程，向Slave同步数据。
                     service.getWaitNotifyObject().wakeupAll();
                     PutMessageStatus replicaStatus = null;
                     try {
+                        // 同步等待写入Slave的commitlog消息返回结果，超时等待5秒
                         replicaStatus = request.future().get(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout(),
                                 TimeUnit.MILLISECONDS);
                     } catch (InterruptedException | ExecutionException | TimeoutException e) {
                     }
+                    // 同步失败，记录log
                     if (replicaStatus != PutMessageStatus.PUT_OK) {
                         log.error("do sync transfer other node, wait return, but failed, topic: " + messageExt.getTopic() + " tags: "
                             + messageExt.getTags() + " client address: " + messageExt.getBornHostNameString());
@@ -1118,6 +1135,7 @@ public class CommitLog {
                     }
                 }
                 // Slave problem
+                // 存放Slave不可用结果，并返回
                 else {
                     // Tell the producer, slave not available
                     putMessageResult.setPutMessageStatus(PutMessageStatus.SLAVE_NOT_AVAILABLE);
@@ -1304,7 +1322,7 @@ public class CommitLog {
     public void destroy() {
         this.mappedFileQueue.destroy();
     }
-
+    // Slave同步Master的消息数据，写入Slave的commitlog文件
     public boolean appendData(long startOffset, byte[] data) {
         putMessageLock.lock();
         try {
@@ -1556,7 +1574,7 @@ public class CommitLog {
             synchronized (this.requestsWrite) {
                 this.requestsWrite.add(request);
             }
-            // 唤醒刷盘线程处理请求
+            // 同步刷盘服务，来一条消息唤醒一次刷盘doCommit()动作，否则刷盘doCommit()处于等待状态，刷盘处于唤醒刷盘线程处理请求
             this.wakeup();
         }
         // 写队列和读队列交换
