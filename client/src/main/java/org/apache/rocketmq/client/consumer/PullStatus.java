@@ -18,18 +18,22 @@ package org.apache.rocketmq.client.consumer;
 
 public enum PullStatus {
     /**
+     * 发现
      * Founded
      */
     FOUND,
     /**
+     * 没有新的消息被拉取
      * No new message can be pull
      */
     NO_NEW_MSG,
     /**
+     * 过滤结果不匹配
      * Filtering results can not match
      */
     NO_MATCHED_MSG,
     /**
+     * 不合法的offset
      * Illegal offset,may be too big or too small
      */
     OFFSET_ILLEGAL

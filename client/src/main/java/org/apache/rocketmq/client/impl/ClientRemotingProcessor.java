@@ -137,7 +137,7 @@ public class ClientRemotingProcessor extends AsyncNettyRequestProcessor implemen
 
         return null;
     }
-
+    // broker端通知client端进行负载均衡
     public RemotingCommand notifyConsumerIdsChanged(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         try {

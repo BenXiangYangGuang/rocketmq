@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.store;
-
+// 查询ConsumeQueue中的消息结果
 public enum GetMessageStatus {
-
+    // 发现
     FOUND,
-
+    // 没有匹配的消息
     NO_MATCHED_MESSAGE,
-
+    // 消息存放在下一个commitlog文件
     MESSAGE_WAS_REMOVING,
 
     OFFSET_FOUND_NULL,
@@ -29,10 +29,10 @@ public enum GetMessageStatus {
     OFFSET_OVERFLOW_BADLY,
 
     OFFSET_OVERFLOW_ONE,
-
+    // 请求的offset 太小
     OFFSET_TOO_SMALL,
 
     NO_MATCHED_LOGIC_QUEUE,
-
+    // 消息不在consumequeue中
     NO_MESSAGE_IN_QUEUE,
 }

@@ -83,28 +83,37 @@ import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
-
+// 一个JVM一个实例，所有消费者、生产者持有同一个MQClientInstance，MQClientInstance只会启动一次。
+// MQ客户端的管理者包括生产者和消费者
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
     private final InternalLogger log = ClientLogger.getLog();
     private final ClientConfig clientConfig;
     private final int instanceIndex;
+    // ip@pid
     private final String clientId;
     private final long bootTimestamp = System.currentTimeMillis();
+    // 一个生产组的生产者内部实例
     private final ConcurrentMap<String/* group */, MQProducerInner> producerTable = new ConcurrentHashMap<String, MQProducerInner>();
+    // 一个消费组的消费者内部实例
     private final ConcurrentMap<String/* group */, MQConsumerInner> consumerTable = new ConcurrentHashMap<String, MQConsumerInner>();
+    // 一个组的消息扩展管理的内部操作实例
     private final ConcurrentMap<String/* group */, MQAdminExtInner> adminExtTable = new ConcurrentHashMap<String, MQAdminExtInner>();
+    // netty客户端配置
     private final NettyClientConfig nettyClientConfig;
+    // 生产者和消费者客户端消息发送和消费的处理的API
     private final MQClientAPIImpl mQClientAPIImpl;
+    // 消息管理功能的默认实现，比如创建Topic、消息的查询等
     private final MQAdminImpl mQAdminImpl;
     // topic 下的路由信息集合
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
     // 更新本地 TopicPublishInfo 路由信息表锁
     private final Lock lockNamesrv = new ReentrantLock();
     private final Lock lockHeartbeat = new ReentrantLock();
-    // 更新 broker 的地址信息
+    // broker 的地址信息
     private final ConcurrentMap<String/* Broker Name */, HashMap<Long/* brokerId */, String/* address */>> brokerAddrTable =
         new ConcurrentHashMap<String, HashMap<Long, String>>();
+    // client向broker发送的版本信息，address：broker address
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable =
         new ConcurrentHashMap<String, HashMap<String, Integer>>();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -114,11 +123,19 @@ public class MQClientInstance {
         }
     });
     private final ClientRemotingProcessor clientRemotingProcessor;
+    // 消息拉取服务
     private final PullMessageService pullMessageService;
+
+    // 消费者和消费队列的消息消费的负载均衡线程服务，里面会调用具体的consumerInner的对topic下的消息队列和消费者组内的消费者进行负载均衡
+    // 为一个负载均衡线程，实时进行调用具体的RebalanceImpl的负载均衡具体实现
     private final RebalanceService rebalanceService;
+    // 默认消息发送者
     private final DefaultMQProducer defaultMQProducer;
+    // 消费者状态管理，为rocketmq监控界面服务
     private final ConsumerStatsManager consumerStatsManager;
+    // 发送心跳总次数
     private final AtomicLong sendHeartbeatTimesTotal = new AtomicLong(0);
+    // 消费者和生产者服务状态
     private ServiceState serviceState = ServiceState.CREATE_JUST;
     private Random random = new Random();
 
@@ -278,7 +295,7 @@ public class MQClientInstance {
                 }
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
-
+        // 定时更新路由信息到NameServer
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -303,7 +320,7 @@ public class MQClientInstance {
                 }
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
-
+        // MQClientInstance定时任务持久化消费进度，默认5s一次
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -315,7 +332,7 @@ public class MQClientInstance {
                 }
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
-
+        // 冬天调整消费者线程池里的数量
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -475,11 +492,13 @@ public class MQClientInstance {
             }
         }
     }
-
+    // 向broker发送心跳
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
+                // 向broker发送心跳
                 this.sendHeartbeatToAllBroker();
+                // 更新消息过滤配置信息
                 this.uploadFilterClassSource();
             } catch (final Exception e) {
                 log.error("sendHeartbeatToAllBroker exception", e);
@@ -538,7 +557,7 @@ public class MQClientInstance {
 
         return false;
     }
-
+    // client向Broker发送心跳，没有重试或者容错机制
     private void sendHeartbeatToAllBroker() {
         final HeartbeatData heartbeatData = this.prepareHeartbeatData();
         final boolean producerEmpty = heartbeatData.getProducerDataSet().isEmpty();
@@ -549,7 +568,9 @@ public class MQClientInstance {
         }
 
         if (!this.brokerAddrTable.isEmpty()) {
+            // 心跳计数
             long times = this.sendHeartbeatTimesTotal.getAndIncrement();
+            // broker address
             Iterator<Entry<String, HashMap<Long, String>>> it = this.brokerAddrTable.entrySet().iterator();
             while (it.hasNext()) {
                 Entry<String, HashMap<Long, String>> entry = it.next();
@@ -566,6 +587,7 @@ public class MQClientInstance {
                             }
 
                             try {
+                                // 发送心跳，返回response相应的版本
                                 int version = this.mQClientAPIImpl.sendHearbeat(addr, heartbeatData, 3000);
                                 if (!this.brokerVersionTable.containsKey(brokerName)) {
                                     this.brokerVersionTable.put(brokerName, new HashMap<String, Integer>(4));
@@ -988,16 +1010,20 @@ public class MQClientInstance {
     public void unregisterAdminExt(final String group) {
         this.adminExtTable.remove(group);
     }
-
+    // 马上唤醒负载均衡线程
     public void rebalanceImmediately() {
         this.rebalanceService.wakeup();
     }
-
+    // 负载均衡线程调用的负载均衡方法
+    // 每个topic对消费者组的负载均衡
     public void doRebalance() {
+        // group-> 一个组的消费者内部实例
+        // 每一个topic下的消费者负载均衡
         for (Map.Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {
                 try {
+                    // 内部消费者实例rebalance方法
                     impl.doRebalance();
                 } catch (Throwable e) {
                     log.error("doRebalance exception", e);
@@ -1102,6 +1128,7 @@ public class MQClientInstance {
 
         if (null != brokerAddr) {
             try {
+                // 根据消费者组，获取消费者Id
                 return this.mQClientAPIImpl.getConsumerIdListByGroup(brokerAddr, group, 3000);
             } catch (Exception e) {
                 log.warn("getConsumerIdListByGroup exception, " + brokerAddr + " " + group, e);
@@ -1158,6 +1185,7 @@ public class MQClientInstance {
                 Long offset = offsetTable.get(mq);
                 if (topic.equals(mq.getTopic()) && offset != null) {
                     try {
+                        // 更新消费者消费进度
                         consumer.updateConsumeOffset(mq, offset);
                         consumer.getRebalanceImpl().removeUnnecessaryMessageQueue(mq, processQueueTable.get(mq));
                         iterator.remove();

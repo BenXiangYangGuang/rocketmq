@@ -36,16 +36,24 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
+ * 广播模式消息队列消费进度存储在消费者本地
+ * 定时任务持久化消费进度，默认5s一次，MQClientInstance.this.persistAllConsumerOffset();
  * Local storage implementation
  */
 public class LocalFileOffsetStore implements OffsetStore {
+    // 消息进度存储目录,默认.rocketmq_offsets
     public final static String LOCAL_OFFSET_STORE_DIR = System.getProperty(
         "rocketmq.client.localOffsetStoreDir",
         System.getProperty("user.home") + File.separator + ".rocketmq_offsets");
     private final static InternalLogger log = ClientLogger.getLog();
+    // client客户端实现类
     private final MQClientInstance mQClientFactory;
+    // 组名称
     private final String groupName;
+    // 全路径存储文件
+    // LOCAL_OFFSET_STORE_DIR/.rocketmq_offsets/{mQClientFactory.getClientId()}/groupName/offsets.json
     private final String storePath;
+    // 消费进度存储结构
     private ConcurrentMap<MessageQueue, AtomicLong> offsetTable =
         new ConcurrentHashMap<MessageQueue, AtomicLong>();
 

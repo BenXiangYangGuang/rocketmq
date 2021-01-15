@@ -49,6 +49,7 @@ public class BrokerConfig {
     private boolean clusterTopicEnable = true;
 
     private boolean brokerTopicEnable = true;
+    // 表示在第一次使用消费组配置信息不存在时，则使用上述值自动创建一个，如果为false，则只能通过客户端命令mqadmin.updateSubGroup创建后修改相关参数。
     @ImportantField
     private boolean autoCreateSubscriptionGroup = true;
     private String messageStorePlugIn = "";
@@ -93,9 +94,9 @@ public class BrokerConfig {
     private int endTransactionPoolQueueCapacity = 100000;
 
     private int filterServerNums = 0;
-
+    // 是否支持长轮训机制
     private boolean longPollingEnable = true;
-
+    // 未开启长轮询，等待1秒，进行消息是否到来的再次判断
     private long shortPollingTimeMills = 1000;
 
     private boolean notifyConsumerIdsChangedEnable = true;

@@ -25,15 +25,21 @@ import org.apache.rocketmq.common.filter.ExpressionType;
 
 import java.util.HashSet;
 import java.util.Set;
-
+// 消费者订阅信息，包含消息过滤的信息
 public class SubscriptionData implements Comparable<SubscriptionData> {
     public final static String SUB_ALL = "*";
+    // 是否是类过滤模式
     private boolean classFilterMode = false;
+    // topic，%RETRY%please_rename_unique_group_name_4
     private String topic;
+    //订阅的tag，字符串 *，表示所有
     private String subString;
+    // 订阅的tag
     private Set<String> tagsSet = new HashSet<String>();
     private Set<Integer> codeSet = new HashSet<Integer>();
+    // 版本信息
     private long subVersion = System.currentTimeMillis();
+    // 表达式类型
     private String expressionType = ExpressionType.TAG;
 
     @JSONField(serialize = false)

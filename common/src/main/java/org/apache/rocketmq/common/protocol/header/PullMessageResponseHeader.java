@@ -23,7 +23,7 @@ package org.apache.rocketmq.common.protocol.header;
 import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.annotation.CFNotNull;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
-
+// 拉取broker消息，broker消息回应Header
 public class PullMessageResponseHeader implements CommandCustomHeader {
     @CFNotNull
     private Long suggestWhichBrokerId;

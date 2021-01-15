@@ -26,11 +26,13 @@ import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.common.utils.ThreadUtils;
-
+// 消息拉取
 public class PullMessageService extends ServiceThread {
     private final InternalLogger log = ClientLogger.getLog();
+    // 拉取消息请求阻塞队列，存放拉取消息的请求,解耦负载均衡创建的拉取请求对象和PullMessageService的消息拉取
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
     private final MQClientInstance mQClientFactory;
+    // 定时任务执行器
     private final ScheduledExecutorService scheduledExecutorService = Executors
         .newSingleThreadScheduledExecutor(new ThreadFactory() {
             @Override
@@ -55,9 +57,10 @@ public class PullMessageService extends ServiceThread {
             log.warn("PullMessageServiceScheduledThread has shutdown");
         }
     }
-
+    // 处理消息拉取请求
     public void executePullRequestImmediately(final PullRequest pullRequest) {
         try {
+            // 放入拉取消息请求阻塞队列，等待请求被处理
             this.pullRequestQueue.put(pullRequest);
         } catch (InterruptedException e) {
             log.error("executePullRequestImmediately pullRequestQueue.put", e);
@@ -75,8 +78,10 @@ public class PullMessageService extends ServiceThread {
     public ScheduledExecutorService getScheduledExecutorService() {
         return scheduledExecutorService;
     }
-
+    // 拉取消息
     private void pullMessage(final PullRequest pullRequest) {
+        // 根据消费者组名称从MQClientInstance中获取消费者内部实现类MQConsumerInner，将consumer强制转换为DefaultMQPushConsumerImpl，
+        // 也就是pullMessageService，该线程只为PUSH服务。
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {
             DefaultMQPushConsumerImpl impl = (DefaultMQPushConsumerImpl) consumer;
@@ -85,14 +90,17 @@ public class PullMessageService extends ServiceThread {
             log.warn("No matched consumer for the PullRequest {}, drop it", pullRequest);
         }
     }
-
+    // 拉取消息的入口
     @Override
     public void run() {
         log.info(this.getServiceName() + " service started");
-
+        // while (!this.isStopped())，这是一种通用的设计技巧，stopped声明为volatile,每执行一次业务逻辑检测一下运行状态，
+        // 可以通过其他线程将stopped设置为true，从而停止该线程
         while (!this.isStopped()) {
             try {
+                // 从pullRequestQueue中获取一个PullRequest消息拉取任务，如果pullRequestQueue为空，则线程将阻塞，直到有拉取任务被放入队列。
                 PullRequest pullRequest = this.pullRequestQueue.take();
+                // 拉取消息
                 this.pullMessage(pullRequest);
             } catch (InterruptedException ignored) {
             } catch (Exception e) {

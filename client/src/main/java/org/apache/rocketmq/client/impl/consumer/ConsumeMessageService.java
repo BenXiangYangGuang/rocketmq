@@ -20,7 +20,7 @@ import java.util.List;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
-
+// 消费拉取到的消息
 public interface ConsumeMessageService {
     void start();
 
@@ -35,7 +35,7 @@ public interface ConsumeMessageService {
     int getCorePoolSize();
 
     ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg, final String brokerName);
-
+    // 提交消息消费请求，供消费者消费消息
     void submitConsumeRequest(
         final List<MessageExt> msgs,
         final ProcessQueue processQueue,

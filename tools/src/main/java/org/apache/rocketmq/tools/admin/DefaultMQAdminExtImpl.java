@@ -88,7 +88,7 @@ import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
 import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.tools.admin.api.MessageTrack;
 import org.apache.rocketmq.tools.admin.api.TrackType;
-
+// MQ管理消息消息的扩展功能接口API操作的具体实现
 public class DefaultMQAdminExtImpl implements MQAdminExt, MQAdminExtInner {
 
     private final InternalLogger log = ClientLogger.getLog();

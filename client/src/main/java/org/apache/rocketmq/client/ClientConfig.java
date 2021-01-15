@@ -30,6 +30,7 @@ import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
 import org.apache.rocketmq.remoting.protocol.LanguageCode;
 
 /**
+ * consumer or producer 配置信息
  * Client Common configuration
  */
 public class ClientConfig {

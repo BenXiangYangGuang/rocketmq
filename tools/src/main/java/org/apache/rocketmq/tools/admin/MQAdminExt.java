@@ -55,7 +55,7 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
 import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.tools.admin.api.MessageTrack;
-
+// MQ管理消息消息的扩展功能接口
 public interface MQAdminExt extends MQAdmin {
     void start() throws MQClientException;
 

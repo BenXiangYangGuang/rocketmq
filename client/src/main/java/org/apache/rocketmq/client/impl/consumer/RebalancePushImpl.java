@@ -31,7 +31,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
 import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
-
+// 推模式下的消费者和消费队列的消息消费的负载均衡
 public class RebalancePushImpl extends RebalanceImpl {
     private final static long UNLOCK_DELAY_TIME_MILLS = Long.parseLong(System.getProperty("rocketmq.client.unlockDelayTimeMills", "20000"));
     private final DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
@@ -46,18 +46,20 @@ public class RebalancePushImpl extends RebalanceImpl {
         super(consumerGroup, messageModel, allocateMessageQueueStrategy, mQClientFactory);
         this.defaultMQPushConsumerImpl = defaultMQPushConsumerImpl;
     }
-
+    // topic下对应的消费的messagequeue发生改变，向broker发送心跳，更新订阅数据信息
     @Override
     public void messageQueueChanged(String topic, Set<MessageQueue> mqAll, Set<MessageQueue> mqDivided) {
         /**
          * When rebalance result changed, should update subscription's version to notify broker.
          * Fix: inconsistency subscription may lead to consumer miss messages.
          */
+        // 更新订阅版本信息
         SubscriptionData subscriptionData = this.subscriptionInner.get(topic);
         long newVersion = System.currentTimeMillis();
         log.info("{} Rebalance changed, also update version: {}, {}", topic, subscriptionData.getSubVersion(), newVersion);
         subscriptionData.setSubVersion(newVersion);
 
+        // 更新限流信息
         int currentQueueCount = this.processQueueTable.size();
         if (currentQueueCount != 0) {
             int pullThresholdForTopic = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getPullThresholdForTopic();
@@ -78,6 +80,7 @@ public class RebalancePushImpl extends RebalanceImpl {
         }
 
         // notify broker
+        // client向broker发送心跳，更新SubscriptionData订阅信息
         this.getmQClientFactory().sendHeartbeatToAllBrokerWithLock();
     }
 
@@ -136,7 +139,7 @@ public class RebalancePushImpl extends RebalanceImpl {
     public void removeDirtyOffset(final MessageQueue mq) {
         this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
     }
-
+    // 计算从哪里拉取message
     @Override
     public long computePullFromWhere(MessageQueue mq) {
         long result = -1;
@@ -210,10 +213,11 @@ public class RebalancePushImpl extends RebalanceImpl {
 
         return result;
     }
-
+    // 将pullRequestList集合中的拉取消息的请求对象PullRequest，放入到阻塞队列pullRequestQueue，等待PullMessageService服务线程进行拉取请求处理
     @Override
     public void dispatchPullRequest(List<PullRequest> pullRequestList) {
         for (PullRequest pullRequest : pullRequestList) {
+            // 处理消息拉取请求
             this.defaultMQPushConsumerImpl.executePullRequestImmediately(pullRequest);
             log.info("doRebalance, {}, add a new pull request {}", consumerGroup, pullRequest);
         }

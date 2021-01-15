@@ -17,12 +17,18 @@
 package org.apache.rocketmq.client.impl.consumer;
 
 import org.apache.rocketmq.common.message.MessageQueue;
-
+// 拉取消息请求，是针对消息队列来说的，并不是针对一个offset为粒度的。
+// 一个PullRequest对应一个MessageQueue，一个ProcessQueue，在消息拉取的过程中一个MessageQueue队列只有这一个PullRequest，拉取消息会反复重用这个PullRequest，只是里面的nextOffset会被更新。
 public class PullRequest {
+    // 消费者组
     private String consumerGroup;
+    // 待拉取消费队列
     private MessageQueue messageQueue;
+    // 消息处理队列，从Broker拉取到的消息先存入ProccessQueue，然后再提交到消费者消费线程池消费
     private ProcessQueue processQueue;
+    // 待拉取的MessageQueue偏移量
     private long nextOffset;
+    // 是否第一次被锁定
     private boolean lockedFirst = false;
 
     public boolean isLockedFirst() {

@@ -23,6 +23,8 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
 /**
+ * offset序列化包装类
+ * {"offsetTable":{{"brokerName":"broker-a","queueId":3,"topic":"TopicTest"}:2,{"brokerName":"broker-a","queueId":2,"topic":"TopicTest"}:1,{"brokerName":"broker-a","queueId":1,"topic":"TopicTest"}:2,{"brokerName":"broker-a","queueId":0,"topic":"TopicTest"}:1}}
  * Wrapper class for offset serialization
  */
 public class OffsetSerializeWrapper extends RemotingSerializable {

@@ -16,7 +16,7 @@
  */
 
 package org.apache.rocketmq.common.protocol.body;
-
+// 消费状态统计
 public class ConsumeStatus {
     private double pullRT;
     private double pullTPS;

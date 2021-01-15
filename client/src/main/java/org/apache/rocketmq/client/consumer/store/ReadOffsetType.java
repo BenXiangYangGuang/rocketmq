@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.client.consumer.store;
-
+// 消息进度读取模式
 public enum ReadOffsetType {
     /**
      * From memory

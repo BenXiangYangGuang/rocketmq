@@ -26,7 +26,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
-
+// consumer运行状态信息，用于RocketMQ监控工具
 public class ConsumerRunningInfo extends RemotingSerializable {
     public static final String PROP_NAMESERVER_ADDR = "PROP_NAMESERVER_ADDR";
     public static final String PROP_THREADPOOL_CORE_SIZE = "PROP_THREADPOOL_CORE_SIZE";
@@ -36,11 +36,12 @@ public class ConsumerRunningInfo extends RemotingSerializable {
     public static final String PROP_CONSUMER_START_TIMESTAMP = "PROP_CONSUMER_START_TIMESTAMP";
 
     private Properties properties = new Properties();
-
+    // 消费者订阅信息，包含消息过滤的信息
     private TreeSet<SubscriptionData> subscriptionSet = new TreeSet<SubscriptionData>();
-
+    // ProcessQueue是MessageQueue在消费端的重现，快照。
+    // MessageQueue的消费状态信息统计
     private TreeMap<MessageQueue, ProcessQueueInfo> mqTable = new TreeMap<MessageQueue, ProcessQueueInfo>();
-
+    // 消费状态统计
     private TreeMap<String/* Topic */, ConsumeStatus> statusTable = new TreeMap<String, ConsumeStatus>();
 
     private String jstack;

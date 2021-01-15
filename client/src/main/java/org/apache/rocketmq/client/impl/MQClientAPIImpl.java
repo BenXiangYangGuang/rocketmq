@@ -163,7 +163,7 @@ import org.apache.rocketmq.remoting.netty.ResponseFuture;
 import org.apache.rocketmq.remoting.protocol.LanguageCode;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
-
+// 生产者和消费者客户端消息发送和消费的处理的API
 public class MQClientAPIImpl {
 
     private final static InternalLogger log = ClientLogger.getLog();
@@ -777,7 +777,7 @@ public class MQClientAPIImpl {
         sendResult.setRegionId(regionId);
         return sendResult;
     }
-
+    // 拉取通信客户端拉取broker消息
     public PullResult pullMessage(
         final String addr,
         final PullMessageRequestHeader requestHeader,
@@ -803,7 +803,7 @@ public class MQClientAPIImpl {
 
         return null;
     }
-
+    // 通信客户端异步拉取broker消息
     private void pullMessageAsync(
         final String addr,
         final RemotingCommand request,
@@ -813,6 +813,7 @@ public class MQClientAPIImpl {
         this.remotingClient.invokeAsync(addr, request, timeoutMillis, new InvokeCallback() {
             @Override
             public void operationComplete(ResponseFuture responseFuture) {
+                // 在收到服务端相应结果后，回调PullCallBack的onSuccess或onException
                 RemotingCommand response = responseFuture.getResponseCommand();
                 if (response != null) {
                     try {
@@ -835,7 +836,7 @@ public class MQClientAPIImpl {
             }
         });
     }
-
+    // 通信客户端同步拉取broker消息
     private PullResult pullMessageSync(
         final String addr,
         final RemotingCommand request,
@@ -845,10 +846,11 @@ public class MQClientAPIImpl {
         assert response != null;
         return this.processPullResponse(response);
     }
-
+    // 根据相应结果解码成PullResultExt对象，此时只是从网络中读取消息列表到byte[]messageBinary属性。
     private PullResult processPullResponse(
         final RemotingCommand response) throws MQBrokerException, RemotingCommandException {
         PullStatus pullStatus = PullStatus.NO_NEW_MSG;
+        // 状态码转换
         switch (response.getCode()) {
             case ResponseCode.SUCCESS:
                 pullStatus = PullStatus.FOUND;
@@ -1080,7 +1082,7 @@ public class MQClientAPIImpl {
 
         this.remotingClient.invokeOneway(MixAll.brokerVIPChannel(this.clientConfig.isVipChannelEnabled(), addr), request, timeoutMillis);
     }
-
+    // client向broker发送心跳
     public int sendHearbeat(
         final String addr,
         final HeartbeatData heartbeatData,
@@ -1161,7 +1163,7 @@ public class MQClientAPIImpl {
         RemotingCommand response = this.remotingClient.invokeSync(addr, request, timeoutMillis);
         return response.getCode() == ResponseCode.SUCCESS;
     }
-
+    // 消费者消费消息失败，然后延迟消费，发送延迟消费消息请求给Broker，作为ACK应答消息
     public void consumerSendMessageBack(
         final String addr,
         final MessageExt msg,
@@ -1194,6 +1196,12 @@ public class MQClientAPIImpl {
         throw new MQBrokerException(response.getCode(), response.getRemark());
     }
 
+    /**
+     * 顺序消息请求锁定broker端消息队列
+     * @param addr 请求broker地址
+     * @param requestBody
+     * @param timeoutMillis 超时时间
+     */
     public Set<MessageQueue> lockBatchMQ(
         final String addr,
         final LockBatchRequestBody requestBody,
@@ -1205,6 +1213,7 @@ public class MQClientAPIImpl {
             request, timeoutMillis);
         switch (response.getCode()) {
             case ResponseCode.SUCCESS: {
+                // 顺序消息broker返回的锁定的消息队列集合
                 LockBatchResponseBody responseBody = LockBatchResponseBody.decode(response.getBody(), LockBatchResponseBody.class);
                 Set<MessageQueue> messageQueues = responseBody.getLockOKMQSet();
                 return messageQueues;

@@ -37,10 +37,11 @@ public class ResponseCode extends RemotingSysResponseCode {
     // 发送 broker 消息失败，topic 不存在
     public static final int TOPIC_NOT_EXIST = 17;
     public static final int TOPIC_EXIST_ALREADY = 18;
+    // 拉取消息，未找到消息
     public static final int PULL_NOT_FOUND = 19;
-
+    // 拉取消息，立即重试
     public static final int PULL_RETRY_IMMEDIATELY = 20;
-
+    // 拉取消息，偏移量移动
     public static final int PULL_OFFSET_MOVED = 21;
 
     public static final int QUERY_NOT_FOUND = 22;

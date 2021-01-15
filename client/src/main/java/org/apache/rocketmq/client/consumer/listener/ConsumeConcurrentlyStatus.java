@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.client.consumer.listener;
-
+// 并发消费状态
 public enum ConsumeConcurrentlyStatus {
     /**
      * Success consumption
      */
     CONSUME_SUCCESS,
     /**
+     * 消费失败一会再试
      * Failure consumption,later try to consume
      */
     RECONSUME_LATER;

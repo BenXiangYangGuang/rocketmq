@@ -19,6 +19,7 @@ package org.apache.rocketmq.client.consumer.listener;
 import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
+ * 并发消费环境上下文
  * Consumer concurrent consumption context
  */
 public class ConsumeConcurrentlyContext {
@@ -28,6 +29,8 @@ public class ConsumeConcurrentlyContext {
      * -1,no retry,put into DLQ directly<br>
      * 0,broker control retry frequency<br>
      * >0,client control retry frequency
+     *
+     * 死信队列（Dead Letter Queue）
      */
     private int delayLevelWhenNextConsume = 0;
     private int ackIndex = Integer.MAX_VALUE;

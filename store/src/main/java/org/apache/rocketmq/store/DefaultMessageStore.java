@@ -600,6 +600,15 @@ public class DefaultMessageStore implements MessageStore {
         return commitLog;
     }
 
+    /**
+     * @param group         Consumer group that launches this query.  消费者组
+     * @param topic         Topic to query.                           查找的topic
+     * @param queueId       Queue ID to query.                        consumequeue的id
+     * @param offset        Logical offset to start from.             带拉取偏移量
+     * @param maxMsgNums    Maximum count of messages to query.       最大拉取条数
+     * @param messageFilter Message filter used to screen desired messages. 消息过滤器
+     * @return
+     */
     public GetMessageResult getMessage(final String group, final String topic, final int queueId, final long offset,
         final int maxMsgNums,
         final MessageFilter messageFilter) {
@@ -616,36 +625,52 @@ public class DefaultMessageStore implements MessageStore {
         long beginTime = this.getSystemClock().now();
 
         GetMessageStatus status = GetMessageStatus.NO_MESSAGE_IN_QUEUE;
+        // 代查找的队列偏移量
         long nextBeginOffset = offset;
+        // 当前消息队列最小偏移量
         long minOffset = 0;
+        // 当前消息队列最大偏移量
         long maxOffset = 0;
 
         GetMessageResult getResult = new GetMessageResult();
-
+        // 当前commitlog文件最大偏移量
         final long maxOffsetPy = this.commitLog.getMaxOffset();
-
+        // 根据主题名称与队列编号获取消息消费队列
         ConsumeQueue consumeQueue = findConsumeQueue(topic, queueId);
         if (consumeQueue != null) {
             minOffset = consumeQueue.getMinOffsetInQueue();
             maxOffset = consumeQueue.getMaxOffsetInQueue();
+            // 异常情况很关键，请留意客户端对上述异常情况的拉取偏移量的校对逻辑，必须正常校对拉取偏移量，否则消息消费将出现堆积
 
             if (maxOffset == 0) {
+                // 表示当前消费队列中没 消息
                 status = GetMessageStatus.NO_MESSAGE_IN_QUEUE;
+                // 下次拉取消息的设置：主节点和从节点不同
+                // 如果当前节点为主节点或offsetCheckInSlave为false,下次拉取偏移量依然为offset
+                // 如果当前节点为从节点或offsetCheckInSlave为true,下次拉取偏移量为0
                 nextBeginOffset = nextOffsetCorrection(offset, 0);
             } else if (offset < minOffset) {
+                // 表示待拉取消息偏移量小于队列的起始偏移量
+                // 如果当前节点为主节点或offsetCheckInSlave为false,下次拉取偏移量依然为offset
+                // 如果当前节点为从节点或offsetCheckInSlave为true,下次拉取偏移量为minOffset
                 status = GetMessageStatus.OFFSET_TOO_SMALL;
                 nextBeginOffset = nextOffsetCorrection(offset, minOffset);
             } else if (offset == maxOffset) {
+                // 表示待拉取消息偏移量等于队列最大偏移量
+                // 下次拉取依然为offset
                 status = GetMessageStatus.OFFSET_OVERFLOW_ONE;
                 nextBeginOffset = nextOffsetCorrection(offset, offset);
             } else if (offset > maxOffset) {
+                // 表示偏移量越界，根据主从节点不同，校对下次拉取的偏移量
                 status = GetMessageStatus.OFFSET_OVERFLOW_BADLY;
                 if (0 == minOffset) {
                     nextBeginOffset = nextOffsetCorrection(offset, minOffset);
                 } else {
                     nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
                 }
+
             } else {
+                // 如果带拉取大于minOffset并且小于maxOffset，从当前offset处尝试拉取32条信息
                 SelectMappedBufferResult bufferConsumeQueue = consumeQueue.getIndexBuffer(offset);
                 if (bufferConsumeQueue != null) {
                     try {
@@ -669,7 +694,7 @@ public class DefaultMessageStore implements MessageStore {
                                 if (offsetPy < nextPhyFileStartOffset)
                                     continue;
                             }
-
+                            // 判断消息是否在磁盘中
                             boolean isInDisk = checkInDiskByCommitOffset(offsetPy, maxOffsetPy);
 
                             if (this.isTheBatchFull(sizePy, maxMsgNums, getResult.getBufferTotalSize(), getResult.getMessageCount(),
@@ -698,7 +723,7 @@ public class DefaultMessageStore implements MessageStore {
 
                                 continue;
                             }
-
+                            // 从commitlog拉取消息
                             SelectMappedBufferResult selectResult = this.commitLog.getMessage(offsetPy, sizePy);
                             if (null == selectResult) {
                                 if (getResult.getBufferTotalSize() == 0) {
@@ -759,7 +784,7 @@ public class DefaultMessageStore implements MessageStore {
         }
         long elapsedTime = this.getSystemClock().now() - beginTime;
         this.storeStatsService.setGetMessageEntireTimeMax(elapsedTime);
-
+        // 设置result结果
         getResult.setStatus(status);
         getResult.setNextBeginOffset(nextBeginOffset);
         getResult.setMaxOffset(maxOffset);
@@ -1250,6 +1275,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     // 根据topic和queueId获取ConsumeQueue
+    // 根据主题名称与队列编号获取消息消费队列，用于消费者消费消息查询
     public ConsumeQueue findConsumeQueue(String topic, int queueId) {
         ConcurrentMap<Integer, ConsumeQueue> map = consumeQueueTable.get(topic);
         if (null == map) {
@@ -1281,7 +1307,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return logic;
     }
-
+    // 下次拉取消息的设置：主节点和从节点不同
     private long nextOffsetCorrection(long oldOffset, long newOffset) {
         long nextOffset = oldOffset;
         if (this.getMessageStoreConfig().getBrokerRole() != BrokerRole.SLAVE || this.getMessageStoreConfig().isOffsetCheckInSlave()) {
@@ -1289,7 +1315,7 @@ public class DefaultMessageStore implements MessageStore {
         }
         return nextOffset;
     }
-
+    // 判断消息是否在磁盘中
     private boolean checkInDiskByCommitOffset(long offsetPy, long maxOffsetPy) {
         long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
         return (maxOffsetPy - offsetPy) > memory;
@@ -1594,7 +1620,7 @@ public class DefaultMessageStore implements MessageStore {
     public BrokerStatsManager getBrokerStatsManager() {
         return brokerStatsManager;
     }
-
+    // 处理定时延迟任务消息
     @Override
     public void handleScheduleMessageService(final BrokerRole brokerRole) {
         if (this.scheduleMessageService != null) {
@@ -2075,8 +2101,15 @@ public class DefaultMessageStore implements MessageStore {
                                 if (size > 0) {
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
+                                    // 回想一下，如果开启了长轮询机制，PullRequestHoldService线程会每隔5秒被唤醒去尝试检测是否有新消息的到来直到超时，
+                                    // 如果被挂起，需要等待5秒，消息拉取实时性比较差，为了避免这种情况，RocketMQ引入了另一种机制：当消息达到时唤醒挂起线程触发一次检测。
+
+                                    // 当新消息到达commitlog时，ReputMessageService线程负责将消息转发给ConsumeQueue、IndexFile，
+                                    // 如果Broker端开启了长轮询模式并且角色为主节点，则最终调用PullRequestHoldService线程的notifyMessageArriving方法唤醒挂起线程，
+                                    // 判断当前消费队列最大偏移量是否大于待拉取偏移量，如果是大于则拉取消息。长轮询模式使得消息拉取能实现准时性。
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                         && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
+                                        // 通知长轮询线程，消息已经到达，返回消息给客户端拉取线程
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                             dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                             dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),

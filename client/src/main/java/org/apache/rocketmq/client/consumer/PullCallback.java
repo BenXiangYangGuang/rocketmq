@@ -17,6 +17,7 @@
 package org.apache.rocketmq.client.consumer;
 
 /**
+ * 消息消费异步拉取broker消息回调处理
  * Async message pulling interface
  */
 public interface PullCallback {

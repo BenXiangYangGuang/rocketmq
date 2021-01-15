@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
-
+// 消费者消费消息，broker查找一个消息的消息结果
 public class GetMessageResult {
 
     private final List<SelectMappedBufferResult> messageMapedList =

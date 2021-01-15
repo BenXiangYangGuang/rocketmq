@@ -170,6 +170,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
                 return this.getEarliestMsgStoretime(ctx, request);
             case RequestCode.GET_BROKER_RUNTIME_INFO:
                 return this.getBrokerRuntimeInfo(ctx, request);
+            // 顺序消息broker锁定messageQueue
             case RequestCode.LOCK_BATCH_MQ:
                 return this.lockBatchMQ(ctx, request);
             case RequestCode.UNLOCK_BATCH_MQ:
@@ -626,7 +627,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
         response.setRemark(null);
         return response;
     }
-
+    // 顺序消息broker锁定messageQueue
     private RemotingCommand lockBatchMQ(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
@@ -636,7 +637,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
             requestBody.getConsumerGroup(),
             requestBody.getMqSet(),
             requestBody.getClientId());
-
+        // 顺序消息broker返回的锁定的消息队列集合
         LockBatchResponseBody responseBody = new LockBatchResponseBody();
         responseBody.setLockOKMQSet(lockOKMQSet);
 

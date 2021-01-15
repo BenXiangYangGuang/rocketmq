@@ -18,25 +18,60 @@
 package org.apache.rocketmq.common.subscription;
 
 import org.apache.rocketmq.common.MixAll;
-//订阅者组信息
+// 消费组的订阅配置信息
+// 消费组订阅信息配置信息存储在Broker的${ROCKETMQ_HOME}/store/config/subscriptiongroup.json。
+// 默认情况下BrokerConfig.autoCreateSubscriptionGroup默认为true，表示在第一次使用消费组配置信息不存在时，则使用上述值自动创建一个，如果为false，则只能通过客户端命令mqadmin.updateSubGroup创建后修改相关参数。
+
+/**
+ * {
+ * 	"dataVersion":{
+ * 		"counter":1,
+ * 		"timestamp":1608644670852
+ *        },
+ * 	"subscriptionGroupTable":{
+ * 		"SELF_TEST_C_GROUP":{
+ * 			"brokerId":0,
+ * 			"consumeBroadcastEnable":true,
+ * 			"consumeEnable":true,
+ * 			"consumeFromMinEnable":true,
+ * 			"groupName":"SELF_TEST_C_GROUP",
+ * 			"notifyConsumerIdsChangedEnable":true,
+ * 			"retryMaxTimes":16,
+ * 			"retryQueueNums":1,
+ * 			"whichBrokerWhenConsumeSlowly":1
+ *        },
+ * 		"please_rename_unique_group_name_4":{
+ * 			"brokerId":0,
+ * 			"consumeBroadcastEnable":true,
+ * 			"consumeEnable":true,
+ * 			"consumeFromMinEnable":true,
+ * 			"groupName":"please_rename_unique_group_name_4",
+ * 			"notifyConsumerIdsChangedEnable":true,
+ * 			"retryMaxTimes":16,
+ * 			"retryQueueNums":1,
+ * 			"whichBrokerWhenConsumeSlowly":1
+ *        }
+ *    }
+ * }
+ */
 public class SubscriptionGroupConfig {
     // 消费者组
     private String groupName;
-    // 允许消费
+    // 允许消费，默认为true，如果为false，该消费组无法拉取消息，从而无法消费消息
     private boolean consumeEnable = true;
     // 允许从最小的offset消费
     private boolean consumeFromMinEnable = true;
-    // 消费广播模式
+    // 是否允许消费广播模式
     private boolean consumeBroadcastEnable = true;
-    // 从事队列数量
+    // 重试队列数量，每一个broker上一个重试队列
     private int retryQueueNums = 1;
     // 重试最大数量
     private int retryMaxTimes = 16;
     // Master注解brokeId：0
     private long brokerId = MixAll.MASTER_ID;
-
+    // 如果主broker消费消息阻塞，转向该broker的从broker拉取消息
     private long whichBrokerWhenConsumeSlowly = 1;
-
+    // 当消息发送变化时，是否立即进行消息队列重新负载
     private boolean notifyConsumerIdsChangedEnable = true;
 
     public String getGroupName() {

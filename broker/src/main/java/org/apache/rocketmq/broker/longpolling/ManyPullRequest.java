@@ -18,7 +18,7 @@ package org.apache.rocketmq.broker.longpolling;
 
 import java.util.ArrayList;
 import java.util.List;
-
+// 长轮询机制持有的挂起请求集合
 public class ManyPullRequest {
     private final ArrayList<PullRequest> pullRequestList = new ArrayList<>();
 
@@ -29,7 +29,9 @@ public class ManyPullRequest {
     public synchronized void addPullRequest(final List<PullRequest> many) {
         this.pullRequestList.addAll(many);
     }
-
+    // 从pullRequestList中获取当前该主题、队列所有的挂起拉取请求，值得注意的是该方法使用了synchronized，
+    // 说明该数据结构会存在并发访问，该属性是PullRequestHoldService线程的私有属性，会存在并发访问？
+    // 是的，ReputMessageService内部持有PullRequestHoldService,也会唤醒挂起线程从而执行消息拉取尝试。
     public synchronized List<PullRequest> cloneListAndClear() {
         if (!this.pullRequestList.isEmpty()) {
             List<PullRequest> result = (ArrayList<PullRequest>) this.pullRequestList.clone();

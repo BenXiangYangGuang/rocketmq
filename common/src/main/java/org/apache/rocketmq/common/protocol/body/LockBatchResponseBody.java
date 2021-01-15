@@ -21,7 +21,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
-
+//顺序消息broker返回的锁定的消息队列集合
 public class LockBatchResponseBody extends RemotingSerializable {
 
     private Set<MessageQueue> lockOKMQSet = new HashSet<MessageQueue>();

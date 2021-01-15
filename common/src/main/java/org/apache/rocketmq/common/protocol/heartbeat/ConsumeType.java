@@ -19,7 +19,7 @@
  * $Id: ConsumeType.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
  */
 package org.apache.rocketmq.common.protocol.heartbeat;
-
+// 消费模式推拉
 public enum ConsumeType {
 
     CONSUME_ACTIVELY("PULL"),

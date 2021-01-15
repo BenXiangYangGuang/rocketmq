@@ -406,6 +406,7 @@ public class ConsumeQueueExt {
     }
 
     /**
+     * ConsumeQueueExt扩展属性的size大小
      * Store unit.
      */
     public static class CqExtUnit {

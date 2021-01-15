@@ -151,12 +151,14 @@ public class MessageStoreConfig {
     // 消息从Master同步到Slave的同步等待时间
     private int syncFlushTimeout = 1000 * 5;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
+    // Broker端默认10s持久化一次消息进度，存储文件名：${RocketMQ_ HOME}/store/config/consumerOffset.json
     private long flushDelayOffsetInterval = 1000 * 10;
     // 是否可强力删除
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
     // mappedFile 热交换
     private boolean warmMapedFileEnable = false;
+    // 消息查询时，是否检查从节点的消息
     private boolean offsetCheckInSlave = false;
     private boolean debugLockEnable = false;
     // 构建ConsumeQueue、Index文件commitlog是否允许重复转发

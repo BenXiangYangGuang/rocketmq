@@ -875,6 +875,8 @@ public class CommitLog {
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             // Delay Delivery
             // 如果是延迟级别消息
+            // 在存Commitlog文件之前，如果消息的延迟级别delayTimeLevel大于0，替换消息的主题与队列为定时任务主题"SCHEDULE_TOPIC_XXX"，
+            // 队列Id为延迟级别-1，再将消息主题、队列存入消息的属性中，键分别为PROPERTY_REAL_TOPIC、PROPERTY_REAL_QUEUE_ID
             if (msg.getDelayTimeLevel() > 0) {
                 // 设置消息延迟级别
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
@@ -886,7 +888,7 @@ public class CommitLog {
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 // Backup real topic, queueId
-                // 将真实的 topic 放入 message 属性中
+                // 将真实的 topic、queueId 放入 message 属性中
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));

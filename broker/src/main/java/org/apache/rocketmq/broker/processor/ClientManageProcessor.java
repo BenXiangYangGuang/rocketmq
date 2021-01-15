@@ -71,7 +71,7 @@ public class ClientManageProcessor extends AsyncNettyRequestProcessor implements
     public boolean rejectRequest() {
         return false;
     }
-
+    // broker端处理心跳信息
     public RemotingCommand heartBeat(ChannelHandlerContext ctx, RemotingCommand request) {
         RemotingCommand response = RemotingCommand.createResponseCommand(null);
         HeartbeatData heartbeatData = HeartbeatData.decode(request.getBody(), HeartbeatData.class);

@@ -20,14 +20,21 @@ import io.netty.channel.Channel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.store.MessageFilter;
-
+// 长轮询拉取请求
 public class PullRequest {
+    // 客户发送的Netty请求
     private final RemotingCommand requestCommand;
+    // 向客户端发送消息的通道
     private final Channel clientChannel;
+    // 请求超时时间
     private final long timeoutMillis;
+    // 请求挂起时间
     private final long suspendTimestamp;
+    // 拉取offset
     private final long pullFromThisOffset;
+    // 订阅数据
     private final SubscriptionData subscriptionData;
+    // 消息过滤器
     private final MessageFilter messageFilter;
 
     public PullRequest(RemotingCommand requestCommand, Channel clientChannel, long timeoutMillis, long suspendTimestamp,

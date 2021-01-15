@@ -18,7 +18,7 @@
 package org.apache.rocketmq.common.protocol.body;
 
 import org.apache.rocketmq.common.UtilAll;
-
+// ProcessQueue是MessageQueue在消费端的重现，快照。
 public class ProcessQueueInfo {
     private long commitOffset;
 

@@ -18,7 +18,7 @@
 package org.apache.rocketmq.store;
 
 import java.util.Map;
-
+// 通知长轮询线程，消息已经到达，返回消息给客户端拉取线程
 public interface MessageArrivingListener {
     void arriving(String topic, int queueId, long logicOffset, long tagsCode,
         long msgStoreTime, byte[] filterBitMap, Map<String, String> properties);

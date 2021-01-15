@@ -26,6 +26,7 @@ public class MessageConst {
     public static final String PROPERTY_WAIT_STORE_MSG_OK = "WAIT";
     // 消息延迟级别
     public static final String PROPERTY_DELAY_TIME_LEVEL = "DELAY";
+    // 消息重试TOPIC
     public static final String PROPERTY_RETRY_TOPIC = "RETRY_TOPIC";
     public static final String PROPERTY_REAL_TOPIC = "REAL_TOPIC";
     public static final String PROPERTY_REAL_QUEUE_ID = "REAL_QID";

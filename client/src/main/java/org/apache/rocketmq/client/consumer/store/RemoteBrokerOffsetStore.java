@@ -37,6 +37,7 @@ import org.apache.rocketmq.common.protocol.header.UpdateConsumerOffsetRequestHea
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
+ * 集群模式消息进度存储文件存放在消息服务端Broker端。
  * Remote storage implementation
  */
 public class RemoteBrokerOffsetStore implements OffsetStore {
@@ -54,7 +55,8 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
     @Override
     public void load() {
     }
-
+    // 更新消费进度offset
+    // 在集群模式下更新消息消费进度的调用方法，在ConsumeMessageConcurrentlyService#processConsumeResult的处理消费消息结果中进行更新。
     @Override
     public void updateOffset(MessageQueue mq, long offset, boolean increaseOnly) {
         if (mq != null) {
@@ -72,10 +74,12 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
             }
         }
     }
-
+    // 从磁盘内存读取，直接读取offsetTable；
+    // 从磁盘读取则发送网络请求，请求命令为QUERY_CONSUMER OFFSET
     @Override
     public long readOffset(final MessageQueue mq, final ReadOffsetType type) {
         if (mq != null) {
+            // 消息消费进度读取模式
             switch (type) {
                 case MEMORY_FIRST_THEN_STORE:
                 case READ_FROM_MEMORY: {
@@ -194,6 +198,16 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
     }
 
     /**
+     * 持久化消息进度，则请求命令为UPDATE_CONSUMER_OFFSET请求，更新ConsumerOffsetManager的offsetTable;
+     * Broker端默认10s持久化一次消息进度，存储文件名：${RocketMQ_ HOME}/store/config/consumerOffset.json
+     * {
+     * 	"offsetTable":{
+     * 		"TopicTest@please_rename_unique_group_name_4":{0:498,1:498,2:500,3:500
+     *                },
+     * 		"%RETRY%please_rename_unique_group_name_4@please_rename_unique_group_name_4":{0:0
+     *        }* 	}
+     * }%
+     * 同步更新消费者消费进度，Master挂了，更新到Slave上。
      * Update the Consumer Offset synchronously, once the Master is off, updated to Slave, here need to be optimized.
      */
     @Override
@@ -223,9 +237,10 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
             throw new MQClientException("The broker[" + mq.getBrokerName() + "] not exist", null);
         }
     }
-
+    // 从Broker读取
     private long fetchConsumeOffsetFromBroker(MessageQueue mq) throws RemotingException, MQBrokerException,
         InterruptedException, MQClientException {
+        // 获取Broker地址
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInAdmin(mq.getBrokerName());
         if (null == findBrokerResult) {
 
@@ -238,7 +253,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
             requestHeader.setTopic(mq.getTopic());
             requestHeader.setConsumerGroup(this.groupName);
             requestHeader.setQueueId(mq.getQueueId());
-
+            // 向Broker发送请求读取消费的offset的请求
             return this.mQClientFactory.getMQClientAPIImpl().queryConsumerOffset(
                 findBrokerResult.getBrokerAddr(), requestHeader, 1000 * 5);
         } else {

@@ -112,7 +112,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         final SendMessageContext mqtraceContext;
         switch (request.getCode()) {
             case RequestCode.CONSUMER_SEND_MSG_BACK:
-                return this.asyncConsumerSendMsgBack(ctx, request);
+            return this.asyncConsumerSendMsgBack(ctx, request);
             default:
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);
                 if (requestHeader == null) {
@@ -136,10 +136,13 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         return this.brokerController.getMessageStore().isOSPageCacheBusy() ||
             this.brokerController.getMessageStore().isTransientStorePoolDeficient();
     }
-
+    // Client发送ACK消息请求给Broker，Broker做出返回消息回应。
+    // 延迟消费消息（ACK消息）存入commitlog文件后，将依托于RocketMQ定时消息机制在延迟时间到期后在次将消息拉取，如果在发送过程中失败，将记录所有发送ACK消息失败的消息，
+    // 然后再次封装成ConsumeRequest，延迟5s执行。
     private CompletableFuture<RemotingCommand> asyncConsumerSendMsgBack(ChannelHandlerContext ctx,
                                                                         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        // 消费者消费消息失败，然后延迟消费，发送延迟消费消息请求
         final ConsumerSendMsgBackRequestHeader requestHeader =
                 (ConsumerSendMsgBackRequestHeader)request.decodeCommandCustomHeader(ConsumerSendMsgBackRequestHeader.class);
         String namespace = NamespaceUtil.getNamespaceFromResource(requestHeader.getGroup());
@@ -147,6 +150,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             ConsumeMessageContext context = buildConsumeMessageContext(namespace, requestHeader, request);
             this.executeConsumeMessageHookAfter(context);
         }
+        // 消费者组订阅配置信息
         SubscriptionGroupConfig subscriptionGroupConfig =
             this.brokerController.getSubscriptionGroupManager().findSubscriptionGroupConfig(requestHeader.getGroup());
         if (null == subscriptionGroupConfig) {
@@ -166,14 +170,14 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             response.setRemark(null);
             return CompletableFuture.completedFuture(response);
         }
-
+        // 创建重试主题，名称：%RETRY%+消费者组名称，并从重试队列中随机选择一个队列，并构建TopicConfig主题配置信息。
         String newTopic = MixAll.getRetryTopic(requestHeader.getGroup());
         int queueIdInt = Math.abs(this.random.nextInt() % 99999999) % subscriptionGroupConfig.getRetryQueueNums();
         int topicSysFlag = 0;
         if (requestHeader.isUnitMode()) {
             topicSysFlag = TopicSysFlag.buildSysFlag(false, true);
         }
-
+        // 创建新的topic
         TopicConfig topicConfig = this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(
             newTopic,
             subscriptionGroupConfig.getRetryQueueNums(),
@@ -189,6 +193,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             response.setRemark(String.format("the topic[%s] sending message is forbidden", newTopic));
             return CompletableFuture.completedFuture(response);
         }
+        // 根据消息物理偏移量从commitlog文件中获取消息，同时将消息的主题存入属性中。
         MessageExt msgExt = this.brokerController.getMessageStore().lookMessageByOffset(requestHeader.getOffset());
         if (null == msgExt) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -204,6 +209,8 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         int delayLevel = requestHeader.getDelayLevel();
 
+        // 设置消息重试次数，如果消息已重试次数超过maxReconsumeTimes，再次改变newTopic主题为DLQ（%DLQ%）死信队列，该主题权限为只写，
+        // 说明消息一旦进入到DLQ队列中，RocketMQ将不负责再次调度进行消费了，需要人工干预。
         int maxReconsumeTimes = subscriptionGroupConfig.getRetryMaxTimes();
         if (request.getVersion() >= MQVersion.Version.V3_4_9.ordinal()) {
             maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();
@@ -213,7 +220,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             || delayLevel < 0) {
             newTopic = MixAll.getDLQTopic(requestHeader.getGroup());
             queueIdInt = Math.abs(this.random.nextInt() % 99999999) % DLQ_NUMS_PER_GROUP;
-
+            //
             topicConfig = this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(newTopic,
                     DLQ_NUMS_PER_GROUP,
                     PermName.PERM_WRITE, 0);
@@ -223,12 +230,15 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                 return CompletableFuture.completedFuture(response);
             }
         } else {
+            // broker处理client端发送callBack处理重试消息，client发送的重试消息的deLayLevel永远为0；不管这是第几次重试；延迟队列的level升级是根据消费次数的增加来增加延时队列的级数。
+            // delayLevel的来源：ConsumeMessageConcurrentlyService#sendMessageCallBack#int delayLevel = context.getDelayLevelWhenNextConsume()
             if (0 == delayLevel) {
                 delayLevel = 3 + msgExt.getReconsumeTimes();
             }
             msgExt.setDelayTimeLevel(delayLevel);
         }
-
+        // 根据原先的消息创建一个新的消息对象，重试消息会拥有自己的唯一消息id并存入到commitlog中，并不会去更新原先的消息，
+        // 而是将原先的主题、消息Id存入消息的属性中，主题名称为重试主题，其他与原先消息保持相同。
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(newTopic);
         msgInner.setBody(msgExt.getBody());
@@ -246,6 +256,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         String originMsgId = MessageAccessor.getOriginMessageId(msgExt);
         MessageAccessor.setOriginMessageId(msgInner, UtilAll.isBlank(originMsgId) ? msgExt.getMsgId() : originMsgId);
+        // 将消息存入到commitlog文件中，前面已经介绍，这里重点突出一个机制，消息重试机制依托于定时任务实现。
         CompletableFuture<PutMessageResult> putMessageResult = this.brokerController.getMessageStore().asyncPutMessage(msgInner);
         return putMessageResult.thenApply((r) -> {
             if (r != null) {
@@ -256,6 +267,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                         if (correctTopic != null) {
                             backTopic = correctTopic;
                         }
+                        // 统计信息正确topic的信息
                         this.brokerController.getBrokerStatsManager().incSendBackNums(requestHeader.getGroup(), backTopic);
                         response.setCode(ResponseCode.SUCCESS);
                         response.setRemark(null);

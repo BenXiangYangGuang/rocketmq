@@ -28,7 +28,7 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.ConsumeQueueExt;
-
+// 处理消息拉取长轮询机制持有的挂起请求的服务
 public class PullRequestHoldService extends ServiceThread {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final String TOPIC_QUEUEID_SEPARATOR = "@";
@@ -41,6 +41,7 @@ public class PullRequestHoldService extends ServiceThread {
         this.brokerController = brokerController;
     }
 
+    // 将请求添加到挂起的队列中，key为topic@queueId，value为ManyPullRequest，一个PullRequest的List集合对象
     public void suspendPullRequest(final String topic, final int queueId, final PullRequest pullRequest) {
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
@@ -62,12 +63,14 @@ public class PullRequestHoldService extends ServiceThread {
         sb.append(queueId);
         return sb.toString();
     }
-
+    // 处理挂起请求的轮询等待和消息到来后的通知
     @Override
     public void run() {
         log.info("{} service started", this.getServiceName());
         while (!this.isStopped()) {
             try {
+                // 如果开启长轮询，每5s尝试一次，判断新消息是否到达。
+                // 如果未开启长轮询，则默认等待1秒再尝试，进行消息是否到来的再次判断
                 if (this.brokerController.getBrokerConfig().isLongPollingEnable()) {
                     this.waitForRunning(5 * 1000);
                 } else {
@@ -75,6 +78,7 @@ public class PullRequestHoldService extends ServiceThread {
                 }
 
                 long beginLockTimestamp = this.systemClock.now();
+                // 检测被挂起请求的offset是否已经到来，offset消息到来进行通知，处理客户端请求，将拉取消息返回给客户。
                 this.checkHoldRequest();
                 long costTime = this.systemClock.now() - beginLockTimestamp;
                 if (costTime > 5 * 1000) {
@@ -92,15 +96,18 @@ public class PullRequestHoldService extends ServiceThread {
     public String getServiceName() {
         return PullRequestHoldService.class.getSimpleName();
     }
-
+    // 检测被挂起请求的offset是否已经到来，offset消息到来进行通知，处理客户端请求，将拉取消息返回给客户。
     private void checkHoldRequest() {
+        // 遍历拉取任务表，根据主题与队列获取消息消费队列最大偏移量，如果该偏移量大于待拉取偏移量，说明有新的消息到达，调用notifyMessageArriving触发消息拉取。
         for (String key : this.pullRequestTable.keySet()) {
             String[] kArray = key.split(TOPIC_QUEUEID_SEPARATOR);
             if (2 == kArray.length) {
                 String topic = kArray[0];
                 int queueId = Integer.parseInt(kArray[1]);
+                // 根据topic，queueId从consumequeue中获取最大的offset
                 final long offset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                 try {
+                    // 通知消息拉取
                     this.notifyMessageArriving(topic, queueId, offset);
                 } catch (Throwable e) {
                     log.error("check hold request failed. topic={}, queueId={}", topic, queueId, e);
@@ -108,23 +115,27 @@ public class PullRequestHoldService extends ServiceThread {
             }
         }
     }
-
+    // 通知消息拉取
     public void notifyMessageArriving(final String topic, final int queueId, final long maxOffset) {
         notifyMessageArriving(topic, queueId, maxOffset, null, 0, null, null);
     }
-
+    // 通知消息拉取
     public void notifyMessageArriving(final String topic, final int queueId, final long maxOffset, final Long tagsCode,
         long msgStoreTime, byte[] filterBitMap, Map<String, String> properties) {
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
         if (mpr != null) {
+            // 从pullRequestList中获取当前该主题、队列所有的挂起拉取请求
             List<PullRequest> requestList = mpr.cloneListAndClear();
             if (requestList != null) {
                 List<PullRequest> replayList = new ArrayList<PullRequest>();
 
                 for (PullRequest request : requestList) {
+                    // 如果消息队列的最大偏移量大于待拉取偏移量，如果消息匹配则调用executeRequestWhenWakeup将消息返回给消息拉取客户端，
+                    // 否则等待下一次尝试。
                     long newestOffset = maxOffset;
                     if (newestOffset <= request.getPullFromThisOffset()) {
+                        // 消息最大的偏移量
                         newestOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                     }
 
@@ -146,7 +157,7 @@ public class PullRequestHoldService extends ServiceThread {
                             continue;
                         }
                     }
-
+                    // 如果挂起超时时间超时，则不继续等待直接返回客户消息未找到
                     if (System.currentTimeMillis() >= (request.getSuspendTimestamp() + request.getTimeoutMillis())) {
                         try {
                             this.brokerController.getPullMessageProcessor().executeRequestWhenWakeup(request.getClientChannel(),
@@ -156,7 +167,7 @@ public class PullRequestHoldService extends ServiceThread {
                         }
                         continue;
                     }
-
+                    // 未到到消息，再次添加到长轮询等待队列
                     replayList.add(request);
                 }
 
