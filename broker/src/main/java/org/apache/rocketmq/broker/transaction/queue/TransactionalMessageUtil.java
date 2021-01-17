@@ -22,6 +22,7 @@ import org.apache.rocketmq.common.topic.TopicValidator;
 import java.nio.charset.Charset;
 
 public class TransactionalMessageUtil {
+    // 删除prepare消息标识d
     public static final String REMOVETAG = "d";
     public static Charset charset = Charset.forName("utf-8");
 

@@ -49,10 +49,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-
+// 封装了事务消息服务对HalfMessage、OperationMessage与底层队列存储相关的操作，用以操作这两个Topic以及Topic下的内部队列。
 public class TransactionalMessageBridge {
     private static final InternalLogger LOGGER = InnerLoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
-
+    // key：prepare消息的MessageQueue value：Operation消息MessageQueue
     private final ConcurrentHashMap<MessageQueue, MessageQueue> opQueueMap = new ConcurrentHashMap<>();
     private final BrokerController brokerController;
     private final MessageStore store;
@@ -195,26 +195,40 @@ public class TransactionalMessageBridge {
     public PutMessageResult putHalfMessage(MessageExtBrokerInner messageInner) {
         return store.putMessage(parseHalfMessageInner(messageInner));
     }
-
+    // 处理事务Prepare消息，异步进行prepare消息的halfTopic落盘操作
     public CompletableFuture<PutMessageResult> asyncPutHalfMessage(MessageExtBrokerInner messageInner) {
         return store.asyncPutMessage(parseHalfMessageInner(messageInner));
     }
-
+    // 解析prepare消息，进行topic、queueId转换
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
+        // 真实topic、queueId放入属性中
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID,
             String.valueOf(msgInner.getQueueId()));
+        // 设置事务相关系统标记
         msgInner.setSysFlag(
             MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), MessageSysFlag.TRANSACTION_NOT_TYPE));
+        // 设置prepare消息的topic为RMQ_SYS_TRANS_HALF_TOPIC；
         msgInner.setTopic(TransactionalMessageUtil.buildHalfTopic());
+        // 队列Id为0，为了方便halftopic下的消息和Operation的topic下的消息进行对比查找，所有prepare消息都存入queueId为0这个队列中。
+        // Operation消息的队列Id和prepare消息的queueId一样，都是0，方便查找事务状态消息的对比。
         msgInner.setQueueId(0);
+        // 放入属性字符串中
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
         return msgInner;
     }
 
+    /**
+     * 删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
+     * @param messageExt prepare消息
+     * @param opType
+     * @return
+     */
     public boolean putOpMessage(MessageExt messageExt, String opType) {
+        // 构建prepare消息的MessageQueue
         MessageQueue messageQueue = new MessageQueue(messageExt.getTopic(),
             this.brokerController.getBrokerConfig().getBrokerName(), messageExt.getQueueId());
+        // 是否删除这条option消息，将它从Operation的topic中的消息表示删除为d
         if (TransactionalMessageUtil.REMOVETAG.equals(opType)) {
             return addRemoveTagInTransactionOp(messageExt, messageQueue);
         }
@@ -271,7 +285,7 @@ public class TransactionalMessageBridge {
         msgInner.setWaitStoreMsgOK(false);
         return msgInner;
     }
-
+    // 将message变换为内部存储的MessageExtBrokerInner消息
     private MessageExtBrokerInner makeOpMessageInner(Message message, MessageQueue messageQueue) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(message.getTopic());
@@ -300,20 +314,28 @@ public class TransactionalMessageBridge {
     }
 
     /**
+     * 在事务消息的commit、rollback时，将这个事务消息的offset对应的Operation的topic下队列的Operation消息标记为d；
+     * 也就是这个标示为d的Operation消息，存入Operation的topic下的消息队列中，然后写入commitlog文件中。
      * Use this function while transaction msg is committed or rollback write a flag 'd' to operation queue for the
      * msg's offset
      *
-     * @param messageExt Op message
-     * @param messageQueue Op message queue
+     * @param messageExt prepare消息
+     * @param messageQueue prepare消息的MessageQueue
      * @return This method will always return true.
      */
     private boolean addRemoveTagInTransactionOp(MessageExt messageExt, MessageQueue messageQueue) {
+        // 新建被标记删除的Operation消息，删除标识赋值给消息的tag标签
         Message message = new Message(TransactionalMessageUtil.buildOpTopic(), TransactionalMessageUtil.REMOVETAG,
             String.valueOf(messageExt.getQueueOffset()).getBytes(TransactionalMessageUtil.charset));
+        // Operation消息写入commitlog中
         writeOp(message, messageQueue);
         return true;
     }
 
+    /**
+     * @param message operation消息
+     * @param mq prepare消息的MessageQueue
+     */
     private void writeOp(Message message, MessageQueue mq) {
         MessageQueue opQueue;
         if (opQueueMap.containsKey(mq)) {
@@ -326,8 +348,10 @@ public class TransactionalMessageBridge {
             }
         }
         if (opQueue == null) {
+            // Operation消息Queue
             opQueue = new MessageQueue(TransactionalMessageUtil.buildOpTopic(), mq.getBrokerName(), mq.getQueueId());
         }
+        // 存储消息到commitlog文件中
         putMessage(makeOpMessageInner(message, opQueue));
     }
 
@@ -338,7 +362,7 @@ public class TransactionalMessageBridge {
         opQueue.setQueueId(halfMQ.getQueueId());
         return opQueue;
     }
-
+    // 根据offset获取commitlog中的prepare消息
     public MessageExt lookMessageByOffset(final long commitLogOffset) {
         return this.store.lookMessageByOffset(commitLogOffset);
     }

@@ -23,7 +23,7 @@ package org.apache.rocketmq.common.protocol.header;
 import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.annotation.CFNotNull;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
-
+// 检查事务状态的请求
 public class CheckTransactionStateRequestHeader implements CommandCustomHeader {
     @CFNotNull
     private Long tranStateTableOffset;

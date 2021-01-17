@@ -29,7 +29,7 @@ public interface MQProducerInner {
 
     TransactionCheckListener checkListener();
     TransactionListener getCheckListener();
-
+    // producer检查本地事务状态
     void checkTransactionState(
         final String addr,
         final MessageExt msg,

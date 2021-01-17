@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 package org.apache.rocketmq.client.producer;
-
+// 事务消费发送是否成功状态
 public class TransactionSendResult extends SendResult {
     private LocalTransactionState localTransactionState;
 

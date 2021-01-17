@@ -38,6 +38,7 @@ public class MessageExt extends Message {
     private int storeSize;
 
     private long queueOffset;
+    // 系统标志，比如事务消息的标志
     private int sysFlag;
     private long bornTimestamp;
     // 消息诞生地址，producer 所在机器 ip

@@ -174,6 +174,7 @@ public class BrokerConfig {
     private int transactionCheckMax = 15;
 
     /**
+     * 60秒事务状态回查间隔
      * Transaction message check interval.
      */
     @ImportantField

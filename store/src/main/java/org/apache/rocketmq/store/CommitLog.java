@@ -870,7 +870,9 @@ public class CommitLog {
         int queueId = msg.getQueueId();
         // 事务回滚消息标志
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
-        // 如果是非事务消息，或者事务消息的 commit 操作；进而判断是不是延迟消息，存储到特殊的延迟消息队列；然后事务消息存储也进行了同样的消息 topic 的转换，从而实现了消息的事务；事务消息非提交阶段，先进行另一个 topic 的储存，如果事务提交了，才进行，存储到消息的真正的topic 中去。
+        // 事务消息不支持延时消息和批量消息。
+        // 如果是非事务消息，或者事务消息的 commit 操作类型消息；才支持延迟消息；
+        // 进而判断是不是延迟消息，存储到特殊的延迟消息队列；然后事务消息存储也进行了同样的消息 topic 的转换，从而实现了消息的事务；事务消息非提交阶段，先进行另一个 topic 的储存，如果事务提交了，才进行，存储到消息的真正的topic 中去。
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             // Delay Delivery

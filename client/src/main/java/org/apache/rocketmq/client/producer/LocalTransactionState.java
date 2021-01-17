@@ -20,7 +20,10 @@ package org.apache.rocketmq.client.producer;
  * 本地事务状态
  */
 public enum LocalTransactionState {
+    // 提交事务，它允许消费者消费此消息。
     COMMIT_MESSAGE,
+    // 回滚事务，它代表该消息将被删除，不允许被消费。
     ROLLBACK_MESSAGE,
+    // 中间状态，它代表需要检查消息队列来确定状态。
     UNKNOW,
 }

@@ -21,11 +21,14 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.protocol.NamespaceUtil;
 import org.apache.rocketmq.remoting.RPCHook;
-
+// 事务消息生产者
 public class TransactionMQProducer extends DefaultMQProducer {
     private TransactionCheckListener transactionCheckListener;
+    // 回查事务消息线程池数量，最小
     private int checkThreadPoolMinSize = 1;
+    // 回查事务消息线程池数量，最大
     private int checkThreadPoolMaxSize = 1;
+    // 事务消息状态回查队列最大消息个数
     private int checkRequestHoldMax = 2000;
 
     private ExecutorService executorService;
@@ -79,14 +82,22 @@ public class TransactionMQProducer extends DefaultMQProducer {
         return this.defaultMQProducerImpl.sendMessageInTransaction(msg, tranExecuter, arg);
     }
 
+    /**
+     * 发送事务消息
+     * @param msg Transactional message to send.
+     * @param arg Argument used along with local transaction executor.
+     * @return
+     * @throws MQClientException
+     */
     @Override
     public TransactionSendResult sendMessageInTransaction(final Message msg,
         final Object arg) throws MQClientException {
         if (null == this.transactionListener) {
             throw new MQClientException("TransactionListener is null", null);
         }
-
+        // 对 topic 进行包装，包装了需要特殊处理的 topic： "%RETRY%"、"%DLQ%"，进行消息的特殊处理，比如 重试、死信队列 topic
         msg.setTopic(NamespaceUtil.wrapNamespace(this.getNamespace(), msg.getTopic()));
+        // 发送事务消息
         return this.defaultMQProducerImpl.sendMessageInTransaction(msg, null, arg);
     }
 

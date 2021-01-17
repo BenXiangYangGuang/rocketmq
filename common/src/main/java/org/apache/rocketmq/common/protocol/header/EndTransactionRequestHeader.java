@@ -22,14 +22,17 @@ import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.annotation.CFNotNull;
 import org.apache.rocketmq.remoting.annotation.CFNullable;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
-
+// Operation消息请求头
 public class EndTransactionRequestHeader implements CommandCustomHeader {
     @CFNotNull
     private String producerGroup;
+    // 准备消息的queueOffset
     @CFNotNull
     private Long tranStateTableOffset;
+    // 物理offset
     @CFNotNull
     private Long commitLogOffset;
+    // 事务消息状态标志
     @CFNotNull
     private Integer commitOrRollback; // TRANSACTION_COMMIT_TYPE
     // TRANSACTION_ROLLBACK_TYPE

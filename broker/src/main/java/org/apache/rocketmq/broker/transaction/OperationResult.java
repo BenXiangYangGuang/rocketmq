@@ -17,8 +17,9 @@
 package org.apache.rocketmq.broker.transaction;
 
 import org.apache.rocketmq.common.message.MessageExt;
-
+// 从commitlog中获取Operation消息的返回结果
 public class OperationResult {
+    // prepare消息
     private MessageExt prepareMessage;
 
     private int responseCode;

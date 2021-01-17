@@ -57,7 +57,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
     public AbstractTransactionalMessageCheckListener(BrokerController brokerController) {
         this.brokerController = brokerController;
     }
-
+    // 异步发送回查消息，msgExt是最新的offset
     public void sendCheckMessage(MessageExt msgExt) throws Exception {
         CheckTransactionStateRequestHeader checkTransactionStateRequestHeader = new CheckTransactionStateRequestHeader();
         checkTransactionStateRequestHeader.setCommitLogOffset(msgExt.getCommitLogOffset());
@@ -76,7 +76,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
             LOGGER.warn("Check transaction failed, channel is null. groupId={}", groupId);
         }
     }
-
+    // 异步发送回查消息，msgExt是最新的offset
     public void resolveHalfMsg(final MessageExt msgExt) {
         executorService.execute(new Runnable() {
             @Override

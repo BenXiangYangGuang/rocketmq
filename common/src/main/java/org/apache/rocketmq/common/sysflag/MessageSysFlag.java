@@ -24,7 +24,7 @@ public class MessageSysFlag {
     public final static int COMPRESSED_FLAG = 0x1;
     // 多个消息标签
     public final static int MULTI_TAGS_FLAG = 0x1 << 1;
-    // 非事务类型
+    // 事务状态未知类型
     public final static int TRANSACTION_NOT_TYPE = 0;
     // 事务准备阶段类型
     public final static int TRANSACTION_PREPARED_TYPE = 0x1 << 2;

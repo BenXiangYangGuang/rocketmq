@@ -17,9 +17,11 @@
 package org.apache.rocketmq.common.message;
 
 import java.net.SocketAddress;
-
+// producer向broker发送事务Operation消息
 public class MessageId {
+    // broker地址socketAddress
     private SocketAddress address;
+    // 消息offset
     private long offset;
 
     public MessageId(SocketAddress address, long offset) {

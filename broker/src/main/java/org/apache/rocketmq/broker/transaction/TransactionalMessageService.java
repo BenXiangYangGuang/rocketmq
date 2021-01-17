@@ -21,10 +21,11 @@ import org.apache.rocketmq.common.protocol.header.EndTransactionRequestHeader;
 import org.apache.rocketmq.store.MessageExtBrokerInner;
 import org.apache.rocketmq.store.PutMessageResult;
 import java.util.concurrent.CompletableFuture;
-
+// 事务消息处理服务
 public interface TransactionalMessageService {
 
     /**
+     * 处理prepare消息
      * Process prepare message, in common, we should put this message to storage service.
      *
      * @param messageInner Prepare(Half) message.
@@ -33,6 +34,8 @@ public interface TransactionalMessageService {
     PutMessageResult prepareMessage(MessageExtBrokerInner messageInner);
 
     /**
+     * 异步处理事务Prepare消息
+     *
      * Process prepare message in async manner, we should put this message to storage service
      *
      * @param messageInner Prepare(Half) message.
@@ -41,13 +44,16 @@ public interface TransactionalMessageService {
     CompletableFuture<PutMessageResult> asyncPrepareMessage(MessageExtBrokerInner messageInner);
 
     /**
+     * 删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
      * Delete prepare message when this message has been committed or rolled back.
      *
-     * @param messageExt
+     * @param messageExt prepare消息
      */
     boolean deletePrepareMessage(MessageExt messageExt);
 
     /**
+     *
+     * 根据offset获取需要commitlog中的prepare消息；
      * Invoked to process commit prepare message.
      *
      * @param requestHeader Commit message request header.
@@ -56,6 +62,7 @@ public interface TransactionalMessageService {
     OperationResult commitMessage(EndTransactionRequestHeader requestHeader);
 
     /**
+     *  根据offset获取，commitlog中的prepare消息
      * Invoked to roll back prepare message.
      *
      * @param requestHeader Prepare message request header.
@@ -64,6 +71,7 @@ public interface TransactionalMessageService {
     OperationResult rollbackMessage(EndTransactionRequestHeader requestHeader);
 
     /**
+     * 处理未提交或未回滚的halfMessage，发送请求到producer进行事务状态回查
      * Traverse uncommitted/unroll back half message and send check back request to producer to obtain transaction
      * status.
      *

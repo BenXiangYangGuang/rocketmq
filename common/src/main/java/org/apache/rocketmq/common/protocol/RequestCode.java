@@ -58,7 +58,7 @@ public class RequestCode {
      * 消费者消费消息失败，然后延迟消费，发送延迟消费消息请求给Broker，作为ACK应答消息
      */
     public static final int CONSUMER_SEND_MSG_BACK = 36;
-
+    // 本地事务结束消息
     public static final int END_TRANSACTION = 37;
     // 根据消费者组获取消费者Id
     public static final int GET_CONSUMER_LIST_BY_GROUP = 38;

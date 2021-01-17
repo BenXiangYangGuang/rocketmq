@@ -24,10 +24,12 @@ import org.apache.rocketmq.common.message.MessageQueue;
  */
 public class SendResult {
     private SendStatus sendStatus;
+    // producer端消息的唯一标识
     private String msgId;
     private MessageQueue messageQueue;
     private long queueOffset;
     private String transactionId;
+    // broker端消息的唯一标识
     private String offsetMsgId;
     private String regionId;
     private boolean traceOn = true;

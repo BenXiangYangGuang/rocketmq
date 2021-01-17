@@ -1031,7 +1031,7 @@ public class MQClientInstance {
             }
         }
     }
-
+    // 根据生产组组找到生产者
     public MQProducerInner selectProducer(final String group) {
         return this.producerTable.get(group);
     }
