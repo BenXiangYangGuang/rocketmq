@@ -1475,7 +1475,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         // 本地事务异常信息
         String remark = localException != null ? ("executeLocalTransactionBranch exception: " + localException.toString()) : null;
         // 事务结束，发送Operation消息
-        this.mQClientFactory.getMQClientAPIImpl().Oneway(brokerAddr, requestHeader, remark,
+        this.mQClientFactory.getMQClientAPIImpl().endTransactionOneway(brokerAddr, requestHeader, remark,
             this.defaultMQProducer.getSendMsgTimeout());
     }
 

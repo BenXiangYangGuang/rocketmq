@@ -1150,7 +1150,7 @@ public class MQClientAPIImpl {
         final Boolean isUnqiueKey
     ) throws RemotingException, MQBrokerException, InterruptedException {
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.QUERY_MESSAGE, requestHeader);
-        request.addExtField(MixAll.UNIQUE_MSG_QUERY_FLAG, isendTransactionUnqiueKey.toString());
+        request.addExtField(MixAll.UNIQUE_MSG_QUERY_FLAG, isUnqiueKey.toString());
         this.remotingClient.invokeAsync(MixAll.brokerVIPChannel(this.clientConfig.isVipChannelEnabled(), addr), request, timeoutMillis,
             invokeCallback);
     }
