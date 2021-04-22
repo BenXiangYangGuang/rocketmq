@@ -584,7 +584,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     /**
      * 同步、异步、oneway 发送消息，最后会调用者 sendDefaultImpl() 方法进行，消息发送，最后都会调用 sendKernelImpl() 这个核心的发送方法，进行发送的封装和最后的发送。
      * 同步发送：一次发送失败或者抛出异常，就会通过 for 循环，无条件进行循环；
-     * 异步发送：一次发送之后，如果 broker 挂了，producer 不能接收到 broker 的应答（失败或者成功），就不会发生消息的重新发送；只有在 producer 收到 broker 应答之后，才会去决定是否发生消息重试,参看 MQClientAPIImpl#sendMessageSync#onExceptionImpl。
+     * 异步发送：一次发送之后，broker正常返回结果，那就直接返回结果；如果 网络超时，broker 挂了，未知异常等；producer 不能接收到 broker 的 response 应答，就会执行异常方法，进行消息重试，最多重试2次，参看 MQClientAPIImpl#sendMessageSync#onExceptionImpl。
      * oneway：只是一次发送，不关心后续结果，不能保证成功
      * @param msg
      * @param communicationMode
@@ -659,7 +659,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             case ONEWAY:
                                 return null;
                             case SYNC:
-                                // 如果消息发送失败，发送另一个 broker 且，不等发送消息的存储结果
+                                // 如果消息发送失败，发送另一个 broker ，且不等发送消息的存储结果
                                 if (sendResult.getSendStatus() != SendStatus.SEND_OK) {
                                     if (this.defaultMQProducer.isRetryAnotherBrokerWhenNotStoreOK()) {
                                         continue;
@@ -1345,7 +1345,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true");
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());
         try {
-            // 同步发送消息
+            // 同步发送消息，broker返回存储prepare消息的存储结果
             sendResult = this.send(msg);
         } catch (Exception e) {
             throw new MQClientException("send message Exception", e);

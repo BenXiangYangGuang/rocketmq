@@ -489,13 +489,13 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     }
 
     /**
-     * 删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
+     * 删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
      * @param msgExt prepare消息
      * @return
      */
     @Override
     public boolean deletePrepareMessage(MessageExt msgExt) {
-        // 删除prepare消息标识d,将这条消息的Operation消息标识为删除状态
+        // 删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；将这条消息的Operation消息标识为删除状态
         if (this.transactionalMessageBridge.putOpMessage(msgExt, TransactionalMessageUtil.REMOVETAG)) {
             log.debug("Transaction op message write successfully. messageId={}, queueId={} msgExt:{}", msgExt.getMsgId(), msgExt.getQueueId(), msgExt);
             return true;

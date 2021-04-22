@@ -22,7 +22,7 @@ import org.apache.rocketmq.common.topic.TopicValidator;
 import java.nio.charset.Charset;
 
 public class TransactionalMessageUtil {
-    // 删除prepare消息标识d
+    // 删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；
     public static final String REMOVETAG = "d";
     public static Charset charset = Charset.forName("utf-8");
 

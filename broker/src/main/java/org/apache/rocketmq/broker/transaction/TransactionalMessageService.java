@@ -44,7 +44,7 @@ public interface TransactionalMessageService {
     CompletableFuture<PutMessageResult> asyncPrepareMessage(MessageExtBrokerInner messageInner);
 
     /**
-     * 删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
+     * 删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
      * Delete prepare message when this message has been committed or rolled back.
      *
      * @param messageExt prepare消息

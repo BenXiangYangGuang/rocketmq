@@ -54,7 +54,7 @@ public class NamesrvController {
     private final KVConfigManager kvConfigManager;
     // topic 路由信息管理
     private final RouteInfoManager routeInfoManager;
-    // 业务线程池
+    // 业务线程池，处理客户端发来的远程请求，客户端也服务端定义好请求，并表示请求code的类型
     private RemotingServer remotingServer;
 
     private BrokerHousekeepingService brokerHousekeepingService;
@@ -62,6 +62,7 @@ public class NamesrvController {
     private ExecutorService remotingExecutor;
 
     private Configuration configuration;
+    // 0.5秒定时任务服务，观察存储文件是否被改变，通过文件的MD5Hash值；
     private FileWatchService fileWatchService;
 
     public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig) {

@@ -153,7 +153,7 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
                     MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED);
                     // 将prepare消息还原成真实的消息，并将消息存储到commitlog中
                     RemotingCommand sendResult = sendFinalMessage(msgInner);
-                    // 成功，删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
+                    // 成功，删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
@@ -168,7 +168,7 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
-                    // 成功，删除prepare消息，将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
+                    // 成功，删除prepare消息，实际为在Operation topic下的commitlog 文件中，将此op message 标记为d，此op message 中存储了prepare message 的offset；将这条事务消息的Operation消息标记为d，将Operation消息写入Operation的topic对应的commitlog文件中
                     this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                 }
                 return res;

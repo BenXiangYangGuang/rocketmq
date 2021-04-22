@@ -173,7 +173,9 @@ public class RemotingUtil {
             sc.socket().setTcpNoDelay(true);
             sc.socket().setReceiveBufferSize(1024 * 64);
             sc.socket().setSendBufferSize(1024 * 64);
+            // 阻塞模式，保证一定链接到server
             sc.socket().connect(remote, timeoutMillis);
+            // 设置socket为非阻塞模式
             sc.configureBlocking(false);
             return sc;
         } catch (Exception e) {

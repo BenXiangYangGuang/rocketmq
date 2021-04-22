@@ -539,7 +539,7 @@ public class MQClientAPIImpl {
     }
 
     /**
-     * 异步发送请求，异步发送注册回调函数，只有收到 broker 的 response 之后才能进行重试，如果网络异常、网络超时、broker 挂了等因素，没有返回 response，并不会发生发送消息的重试
+     * 异步发送请求，异步发送注册回调函数，只有收到 broker 的 response 之后才能进行重试，如果网络异常、网络超时、broker 挂了未知等因素，没有返回 response，进行异步发送消息的重试，默认3次；
      * @param addr
      * @param brokerName
      * @param msg

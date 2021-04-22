@@ -704,6 +704,7 @@ public class MQClientInstance {
                                     MQConsumerInner impl = entry.getValue();
                                     if (impl != null) {
                                         // 更新 RebalanceImpl#ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable
+                                        // 更新消费者的订阅的topic信息发生变化
                                         impl.updateTopicSubscribeInfo(topic, subscribeInfo);
                                     }
                                 }

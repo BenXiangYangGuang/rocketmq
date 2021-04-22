@@ -52,6 +52,7 @@ public class HAService {
 
     private final DefaultMessageStore defaultMessageStore;
     // WaitNotifyObject是用来管理多个Master和Slave的HAConnection的，唤醒WriteSocketService中Master向Slave写CommitLog数据的，
+    // waitNotifyObject 协调GroupTransferService同步消息GroupCommitRequest 与 WriteSocketService写commitlog线程之间通信的；
     private final WaitNotifyObject waitNotifyObject = new WaitNotifyObject();
     // 推送的slave的最大的offset
     private final AtomicLong push2SlaveMaxOffset = new AtomicLong(0);
@@ -425,7 +426,7 @@ public class HAService {
             // position、limit方法也不会清除数据，只是修改指针，方便数据的读取
             this.reportOffset.position(0);
             this.reportOffset.limit(8);
-            // 向socket写入最大的offset，最多写3次
+            // 向socket写入最大的offset，最多写3次，socketChannel为非阻塞模式，不能保证一次写入数据到socketChannel成功，这里写三次；
             for (int i = 0; i < 3 && this.reportOffset.hasRemaining(); i++) {
                 try {
                     this.socketChannel.write(this.reportOffset);
@@ -437,7 +438,7 @@ public class HAService {
             }
             // 本次发送offset的时间
             lastWriteTimestamp = HAService.this.defaultMessageStore.getSystemClock().now();
-            // 是否数据写socketChannel完毕
+            // 若超过3次还未能将8字节发送到Master Broker，说明存在问题，返回false，关闭此SocketChannel
             return !this.reportOffset.hasRemaining();
         }
         // ByteBuffer交换，创建新的空间
@@ -638,7 +639,7 @@ public class HAService {
                         if (this.isTimeToReportOffset()) {
                             //Slave向Master发送当前Slave的commitlog的最大offset
                             boolean result = this.reportSlaveMaxOffset(this.currentReportedOffset);
-                            // 没有写完关闭Master
+                            // 没有写完,返回false，未能将8字节offset发送到Master Broker，说明存在问题，返回false，关闭此SocketChannel
                             if (!result) {
                                 this.closeMaster();
                             }
@@ -647,6 +648,7 @@ public class HAService {
                         // I/O复用，检查是否有读事件
                         this.selector.select(1000);
                         // 处理Master返回的待处理消息，将返回的消息写入commitlog文件，并构建consumequeue、indexfile索引文件
+                        // 如果处理失败表示，socketChannel存在问题，将此SocketChannel关闭
                         boolean ok = this.processReadEvent();
                         if (!ok) {
                             // 关闭Master
@@ -660,6 +662,7 @@ public class HAService {
                         long interval =
                             HAService.this.getDefaultMessageStore().getSystemClock().now()
                                 - this.lastWriteTimestamp;
+                        // 两次报告Slave offset超时，也会断开Slave与Master的socketChannel连接；
                         if (interval > HAService.this.getDefaultMessageStore().getMessageStoreConfig()
                             .getHaHousekeepingInterval()) {
                             log.warn("HAClient, housekeeping, found this connection[" + this.masterAddress
