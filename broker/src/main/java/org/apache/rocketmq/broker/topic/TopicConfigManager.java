@@ -159,6 +159,15 @@ public class TopicConfigManager extends ConfigManager {
         return this.topicConfigTable.get(topic);
     }
 
+    /**
+     * 创建用户自定义 topic 配置
+     * @param topic
+     * @param defaultTopic
+     * @param remoteAddress
+     * @param clientDefaultTopicQueueNums
+     * @param topicSysFlag
+     * @return
+     */
     public TopicConfig createTopicInSendMessageMethod(final String topic, final String defaultTopic,
         final String remoteAddress, final int clientDefaultTopicQueueNums, final int topicSysFlag) {
         TopicConfig topicConfig = null;
@@ -233,6 +242,14 @@ public class TopicConfigManager extends ConfigManager {
         return topicConfig;
     }
 
+    /**
+     * 创建系统后台应用 topic 配置
+     * @param topic
+     * @param clientDefaultTopicQueueNums
+     * @param perm
+     * @param topicSysFlag
+     * @return
+     */
     public TopicConfig createTopicInSendMessageBackMethod(
         final String topic,
         final int clientDefaultTopicQueueNums,

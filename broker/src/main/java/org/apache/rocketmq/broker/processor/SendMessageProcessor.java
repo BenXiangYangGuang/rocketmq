@@ -438,7 +438,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         }
 
         response.setCode(-1);
-        // 消息检查
+        // 消息检查，创建topic、messagequeue队列个数
         super.msgCheck(ctx, requestHeader, response);
         if (response.getCode() != -1) {
             return response;
